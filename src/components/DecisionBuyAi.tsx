@@ -39,6 +39,24 @@ function saveTrackedGoldens(data: TrackedGolden[]) {
     localStorage.setItem(GOLDEN_TRACKER_KEY, JSON.stringify(filtered));
 }
 
+interface DecisionBuyAiProps {
+    tickers: CexTicker[];
+    vwapStore: Record<string, VwapData>;
+    firstSeenTimes: Record<string, number>;
+    isLoading: boolean;
+    onTickerClick: (ticker: CexTicker) => void;
+    onAddToWatchlist: (ticker: CexTicker) => void;
+}
+
+interface BuySignal {
+    ticker: CexTicker;
+    vwap: VwapData;
+    score: number;
+    reason: string;
+    type: 'GOLDEN' | 'MOMENTUM' | 'SUPPORT' | 'EXIT';
+    activeSince?: number; // timestamp
+}
+
 // ─── Memoized Signal Card ─────────────────
 interface SignalCardProps {
     sig: BuySignal;
@@ -322,17 +340,17 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
 
     // Filtered signals for UI display (Show only GOLDEN Entry signals)
     const displaySignals = useMemo(() => {
-        return signals.filter(s => s.type === 'GOLDEN');
+        return signals.filter((s: BuySignal) => s.type === 'GOLDEN');
     }, [signals]);
 
     // ─── Telegram Alert Trigger ───────────────────
     useEffect(() => {
         if (!tgConfig.enabled) return;
 
-        const allActiveSymbols = new Set(signals.map(s => s.ticker.symbol));
+        const allActiveSymbols = new Set(signals.map((s: BuySignal) => s.ticker.symbol));
 
         let sent = 0;
-        signals.forEach(sig => {
+        signals.forEach((sig: BuySignal) => {
             const symbol = sig.ticker.symbol;
 
             if (sig.type === 'GOLDEN') {
@@ -381,8 +399,8 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
 
         // Cleanup: tokens that completely fell out of signals
         const cleanupList = [alertedRef, exitAlertedRef];
-        cleanupList.forEach(ref => {
-            ref.current.forEach(symbol => {
+        cleanupList.forEach((ref: React.MutableRefObject<Set<string>>) => {
+            ref.current.forEach((symbol: string) => {
                 if (!allActiveSymbols.has(symbol)) {
                     ref.current.delete(symbol);
                 }
@@ -401,8 +419,8 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             let updated = [...prev];
 
             // 1. Add new golden signals not yet tracked
-            goldenSignals.forEach(sig => {
-                const existing = updated.find(t => t.symbol === sig.ticker.symbol);
+            goldenSignals.forEach((sig: BuySignal) => {
+                const existing = updated.find((t: TrackedGolden) => t.symbol === sig.ticker.symbol);
                 if (!existing) {
                     updated.push({
                         symbol: sig.ticker.symbol,
@@ -418,8 +436,8 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             });
 
             // 2. Update all tracked entries with current prices
-            updated = updated.map(t => {
-                const ticker = tickers.find(tk => tk.symbol === t.symbol);
+            updated = updated.map((t: TrackedGolden) => {
+                const ticker = tickers.find((tk: CexTicker) => tk.symbol === t.symbol);
                 if (!ticker) return t;
 
                 const currentPrice = ticker.priceUsd;
@@ -585,7 +603,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             {/* Signal Grid - Premium Cards */}
             <div className="flex-1 overflow-y-auto p-8 lg:p-12 custom-scrollbar">
                 <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-8">
-                    {displaySignals.map((sig) => (
+                    {displaySignals.map((sig: BuySignal) => (
                         <SignalCard
                             key={sig.ticker.id}
                             sig={sig}
