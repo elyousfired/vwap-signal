@@ -1,4 +1,4 @@
-import { CexTicker, VwapData, OHLCV } from '../types';
+import type { CexTicker, VwapData, OHLCV } from '../types';
 // Binance Public API (data-api.binance.vision for global access, no geo-block)
 const BINANCE_REST_API = 'https://data-api.binance.vision/api/v3/ticker/24hr';
 const BINANCE_WS_URL = 'wss://stream.binance.com:9443/ws/!ticker@arr';

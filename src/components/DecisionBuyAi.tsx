@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { CexTicker, VwapData } from '../types';
+import type { CexTicker, VwapData } from '../types';
 import { fetchWeeklyVwapData, formatPrice } from '../services/cexService';
 import { Brain, Star, TrendingUp, TrendingDown, Info, ArrowRight, Zap, Trophy, ShieldCheck, Bell, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Filter, BarChart3, Target } from 'lucide-react';
-import { sendGoldenSignalAlert, wasAlertedToday, loadTelegramConfig, saveTelegramConfig, sendTestAlert, TelegramConfig } from '../services/telegramService';
+import { sendGoldenSignalAlert, wasAlertedToday, loadTelegramConfig, saveTelegramConfig, sendTestAlert } from '../services/telegramService';
+import type { TelegramConfig } from '../services/telegramService';
 
 // ─── Golden Signal Tracker Types ───────────────
 interface TrackedGolden {
@@ -66,7 +67,7 @@ export const DecisionBuyAi: React.FC<DecisionBuyAiProps> = ({
     const [showSettings, setShowSettings] = useState(false);
     const [tgConfig, setTgConfig] = useState<TelegramConfig>(loadTelegramConfig);
     const [testStatus, setTestStatus] = useState<'idle' | 'sending' | 'ok' | 'fail'>('idle');
-    const [alertCount, setAlertCount] = useState(0);
+    const [_alertCount, setAlertCount] = useState(0);
     const [audioEnabled, setAudioEnabled] = useState(() => {
         const saved = localStorage.getItem('dexpulse_audio_alerts');
         return saved ? saved === 'true' : true;
@@ -285,7 +286,7 @@ export const DecisionBuyAi: React.FC<DecisionBuyAiProps> = ({
 
                 // Update history every 10 minutes (limit to 144 points for 24h)
                 const history = t.history || [t.entryPrice];
-                const lastPoint = history[history.length - 1];
+                const _lastPoint = history[history.length - 1];
                 const shouldAddPoint = history.length < 144 && (Date.now() - (t.signalTime + (history.length - 1) * 10 * 60 * 1000) > 10 * 60 * 1000);
 
                 return {
