@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CexTicker, VwapData } from './types';
+import type { CexTicker, VwapData } from './types';
 import { fetchCexTickers, fetchWeeklyVwapData } from './services/cexService';
 import { DecisionBuyAi } from './components/DecisionBuyAi';
 import { Brain, Zap, Activity, Globe, RefreshCcw } from 'lucide-react';

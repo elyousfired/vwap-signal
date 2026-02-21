@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { CexTicker, VwapData } from '../types';
-import { fetchWeeklyVwapData, formatPrice } from '../services/cexService';
-import { Brain, Star, TrendingUp, TrendingDown, Info, ArrowRight, Zap, Trophy, ShieldCheck, Bell, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Filter, BarChart3, Target } from 'lucide-react';
-import { sendGoldenSignalAlert, wasAlertedToday, loadTelegramConfig, saveTelegramConfig, sendTestAlert } from '../services/telegramService';
+import { formatPrice } from '../services/cexService';
+import { Brain, Star, TrendingUp, TrendingDown, Info, ArrowRight, Zap, Trophy, ShieldCheck, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Target } from 'lucide-react';
+import { sendGoldenSignalAlert, loadTelegramConfig, saveTelegramConfig, sendTestAlert } from '../services/telegramService';
 import type { TelegramConfig } from '../services/telegramService';
 
 // ─── Golden Signal Tracker Types ───────────────
@@ -286,7 +286,6 @@ export const DecisionBuyAi: React.FC<DecisionBuyAiProps> = ({
 
                 // Update history every 10 minutes (limit to 144 points for 24h)
                 const history = t.history || [t.entryPrice];
-                const _lastPoint = history[history.length - 1];
                 const shouldAddPoint = history.length < 144 && (Date.now() - (t.signalTime + (history.length - 1) * 10 * 60 * 1000) > 10 * 60 * 1000);
 
                 return {
