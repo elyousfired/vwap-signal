@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { CexTicker, VwapData } from './types';
 import { fetchCexTickers, fetchWeeklyVwapData } from './services/cexService';
 import { DecisionBuyAi } from './components/DecisionBuyAi';

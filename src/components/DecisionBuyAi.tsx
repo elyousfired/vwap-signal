@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import type { FC } from 'react';
 import type { CexTicker, VwapData } from '../types';
 import { formatPrice } from '../services/cexService';
 import { Brain, Star, TrendingUp, TrendingDown, Info, ArrowRight, Zap, Trophy, ShieldCheck, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Target } from 'lucide-react';
@@ -56,7 +57,7 @@ interface BuySignal {
     activeSince?: number; // timestamp
 }
 
-export const DecisionBuyAi: React.FC<DecisionBuyAiProps> = ({
+export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
     tickers,
     vwapStore,
     firstSeenTimes,
