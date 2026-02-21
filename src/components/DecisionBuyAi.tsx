@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import type { CexTicker, VwapData } from '../types';
 import { formatPrice } from '../services/cexService';
-import { Brain, Star, TrendingUp, TrendingDown, Info, ArrowRight, Zap, Trophy, ShieldCheck, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Target } from 'lucide-react';
+import { Brain, Star, TrendingUp, TrendingDown, ArrowRight, Zap, Trophy, ShieldCheck, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Target, RefreshCcw } from 'lucide-react';
 import { sendGoldenSignalAlert, loadTelegramConfig, saveTelegramConfig, sendTestAlert } from '../services/telegramService';
 import type { TelegramConfig } from '../services/telegramService';
 
@@ -456,8 +456,8 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                             <div className="flex items-start justify-between mb-8 relative z-10">
                                 <div className="flex items-center gap-5">
                                     <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl transition-all duration-500 group-hover:rotate-6 ${sig.type === 'GOLDEN' ? 'bg-gradient-to-br from-amber-400 to-orange-600 text-black shadow-amber-500/20' :
-                                            sig.type === 'MOMENTUM' ? 'bg-gradient-to-br from-purple-500 to-indigo-700 text-white shadow-purple-500/20' :
-                                                'bg-gradient-to-br from-blue-500 to-cyan-700 text-white'
+                                        sig.type === 'MOMENTUM' ? 'bg-gradient-to-br from-purple-500 to-indigo-700 text-white shadow-purple-500/20' :
+                                            'bg-gradient-to-br from-blue-500 to-cyan-700 text-white'
                                         }`}>
                                         {sig.ticker.symbol[0]}
                                     </div>

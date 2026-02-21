@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { CexTicker, VwapData } from './types';
 import { fetchCexTickers, fetchWeeklyVwapData } from './services/cexService';
 import { DecisionBuyAi } from './components/DecisionBuyAi';
-import { Brain, Zap, Activity, Globe, RefreshCcw } from 'lucide-react';
+import { Brain, Zap, Globe, RefreshCcw } from 'lucide-react';
 
 function App() {
   const [tickers, setTickers] = useState<CexTicker[]>([]);
@@ -214,7 +214,5 @@ function App() {
     </div>
   );
 }
-
-export default App;
 
 export default App;
