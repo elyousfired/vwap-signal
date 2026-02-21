@@ -322,201 +322,214 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
 
     if (isLoading && Object.keys(vwapStore).length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center p-20 text-gray-500 gap-4">
-                <Brain className="w-12 h-12 text-purple-500 animate-pulse" />
-                <p className="text-sm font-black tracking-widest uppercase">AI Engine Analyzing Buy Signals...</p>
+            <div className="flex flex-col items-center justify-center p-32 text-gray-500 gap-8">
+                <div className="relative">
+                    <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full animate-pulse-slow"></div>
+                    <Brain className="w-20 h-20 text-purple-500/40 relative z-10" />
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                    <p className="text-sm font-black tracking-[0.4em] text-white/40 uppercase italic">Neural Network Mapping Market Signals</p>
+                    <div className="w-48 h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div className="w-1/3 h-full bg-gradient-to-r from-purple-600 to-blue-600 animate-[loading_2s_infinite]"></div>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-full bg-[#0d0f14] rounded-2xl border border-purple-500/20 shadow-[0_0_50px_rgba(168,85,247,0.05)] overflow-hidden">
-            {/* AI Header */}
-            <div className="p-6 border-b border-purple-500/20 bg-gradient-to-r from-purple-900/10 to-transparent flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-purple-500/20 rounded-2xl border border-purple-500/30">
-                        <Brain className="w-8 h-8 text-purple-400" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-black tracking-tighter text-white uppercase italic">Decision Buy AI</h2>
-                        <p className="text-xs text-purple-400/60 font-medium font-mono lowercase">Predictive breakout & support engine v1.0</p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-black/40 rounded-xl p-1 border border-purple-500/20 mr-2">
+        <div className="flex flex-col h-full bg-transparent overflow-hidden">
+            {/* AI Sub-Header/Filters */}
+            <div className="px-8 py-6 border-b border-white/[0.03] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center bg-black/40 rounded-2xl p-1.5 border border-white/[0.05] shadow-inner">
                         <button
                             onClick={() => setSortBy('score')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${sortBy === 'score' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
+                            className={`px-5 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex items-center gap-2.5 ${sortBy === 'score' ? 'bg-purple-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-white/40 hover:text-white/70'
                                 }`}
                         >
-                            <Trophy className="w-3 h-3" />
-                            SCORE
+                            <Trophy className="w-3.5 h-3.5" />
+                            TOP SCORE
                         </button>
                         <button
                             onClick={() => setSortBy('time')}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${sortBy === 'time' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'
+                            className={`px-5 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex items-center gap-2.5 ${sortBy === 'time' ? 'bg-purple-600 text-white shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'text-white/40 hover:text-white/70'
                                 }`}
                         >
-                            <Timer className="w-3 h-3" />
-                            TIME
+                            <Timer className="w-3.5 h-3.5" />
+                            NEWEST
+                        </button>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3 pr-4 border-r border-white/10">
+                        <div className="text-right">
+                            <span className="block text-[8px] font-black text-white/20 uppercase tracking-widest leading-none">Alerts</span>
+                            <span className="text-sm font-black text-purple-400 italic">#{_alertCount} Today</span>
+                        </div>
+                        <button
+                            onClick={() => setAudioEnabled(!audioEnabled)}
+                            className={`w-10 h-10 rounded-xl border transition-all flex items-center justify-center ${audioEnabled ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' : 'bg-white/5 border-white/10 text-white/20 hover:text-white/40'}`}
+                        >
+                            {audioEnabled ? <Volume2 className="w-4 h-4 shadow-sm" /> : <VolumeX className="w-4 h-4" />}
                         </button>
                     </div>
 
                     <button onClick={() => setShowSettings(!showSettings)}
-                        className={`p-3 rounded-xl border transition-all ${showSettings ? 'bg-purple-600 border-purple-400 text-white' : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:text-white'}`}>
+                        className={`w-12 h-12 rounded-2xl border transition-all flex items-center justify-center ${showSettings ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}>
                         <Settings className={`w-5 h-5 ${showSettings ? 'animate-spin-slow' : ''}`} />
                     </button>
                 </div>
             </div>
 
-            {/* Telegram Settings Panel */}
+            {/* Telegram Settings Panel - Premium Slide Down */}
             {showSettings && (
-                <div className="p-5 bg-[#0a0c10] border-b border-gray-800">
-                    <div className="flex items-center gap-2 mb-4">
-                        <Settings className="w-4 h-4 text-purple-400" />
-                        <h3 className="text-xs font-black text-white uppercase tracking-widest">Telegram Alerts</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider block mb-1">Bot Token</label>
-                            <input type="password" placeholder="123456:ABC-DEF1234ghIkl..." value={tgConfig.botToken}
-                                onChange={e => handleSaveConfig({ ...tgConfig, botToken: e.target.value })}
-                                className="w-full bg-black/60 text-white text-sm font-mono px-3 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider block mb-1">Chat IDs (comma-separated)</label>
-                            <input type="text" placeholder="123456789, 987654321" value={tgConfig.chatId}
-                                onChange={e => handleSaveConfig({ ...tgConfig, chatId: e.target.value })}
-                                className="w-full bg-black/60 text-white text-sm font-mono px-3 py-2 rounded-lg border border-gray-700 focus:outline-none focus:border-purple-500" />
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                            <div className={`w-10 h-5 rounded-full relative transition-all ${tgConfig.enabled ? 'bg-emerald-500' : 'bg-gray-700'}`}
-                                onClick={() => handleSaveConfig({ ...tgConfig, enabled: !tgConfig.enabled })}>
-                                <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${tgConfig.enabled ? 'left-5.5' : 'left-0.5'}`}></div>
+                <div className="mx-8 mt-6 p-8 glass-card rounded-3xl border border-purple-500/20 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="flex items-center justify-between mb-8">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                                <Send className="w-6 h-6 text-purple-400" />
                             </div>
-                            <span className="text-xs font-bold text-gray-400">{tgConfig.enabled ? 'Alerts ON' : 'Alerts OFF'}</span>
-                        </label>
-                        <button onClick={handleTestAlert} disabled={!tgConfig.botToken || !tgConfig.chatId || testStatus === 'sending'}
-                            className="flex items-center gap-2 px-4 py-2 bg-purple-600/20 text-purple-400 border border-purple-500/30 rounded-xl text-[10px] font-black uppercase hover:bg-purple-600 hover:text-white transition-all disabled:opacity-30">
-                            {testStatus === 'sending' ? <Send className="w-3 h-3 animate-pulse" /> :
-                                testStatus === 'ok' ? <CheckCircle className="w-3 h-3 text-emerald-400" /> :
-                                    testStatus === 'fail' ? <XCircle className="w-3 h-3 text-rose-400" /> :
-                                        <Send className="w-3 h-3" />}
-                            {testStatus === 'ok' ? 'Sent!' : testStatus === 'fail' ? 'Failed' : 'Test Alert'}
-                        </button>
-                    </div>
-                    <div className="flex items-center justify-between border-t border-gray-800 pt-4 mt-4">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setAudioEnabled(!audioEnabled)}
-                                className={`p-2 rounded-lg border transition-all ${audioEnabled ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-gray-800 border-gray-700 text-gray-500'}`}
-                            >
-                                {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-                            </button>
                             <div>
-                                <h4 className="text-[10px] font-black text-white uppercase">Audio Alarm</h4>
-                                <p className="text-[9px] text-gray-500 font-bold uppercase">Sound on Golden Signal</p>
+                                <h3 className="text-sm font-black text-white uppercase tracking-[0.2em]">Telegram Integration</h3>
+                                <p className="text-[10px] text-white/30 font-bold uppercase">Real-time signal synchronization</p>
                             </div>
                         </div>
-                        <button
-                            onClick={playAlarm}
-                            className="px-4 py-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all"
-                        >
-                            Test Sound
+                        <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-4 cursor-pointer group bg-black/40 px-5 py-3 rounded-2xl border border-white/5">
+                                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest group-hover:text-white transition-colors">{tgConfig.enabled ? 'Push Active' : 'Push Disabled'}</span>
+                                <div className={`w-12 h-6 rounded-full relative transition-all duration-300 ${tgConfig.enabled ? 'bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.5)]' : 'bg-white/10'}`}
+                                    onClick={() => handleSaveConfig({ ...tgConfig, enabled: !tgConfig.enabled })}>
+                                    <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-lg ${tgConfig.enabled ? 'left-7' : 'left-1'}`}></div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div className="space-y-2">
+                            <label className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] ml-1">Bot Authentication Token</label>
+                            <div className="relative group">
+                                <input type="password" placeholder="•••••••••••••••••••••••••••••" value={tgConfig.botToken}
+                                    onChange={e => handleSaveConfig({ ...tgConfig, botToken: e.target.value })}
+                                    className="w-full bg-black/60 text-white text-sm font-mono px-5 py-4 rounded-2xl border border-white/5 focus:outline-none focus:border-purple-500/50 focus:bg-black/80 transition-all" />
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[9px] font-black text-white/30 uppercase tracking-[0.2em] ml-1">Terminal Chat IDs (Global)</label>
+                            <input type="text" placeholder="-100xxxxxxxxxx, 123456789" value={tgConfig.chatId}
+                                onChange={e => handleSaveConfig({ ...tgConfig, chatId: e.target.value })}
+                                className="w-full bg-black/60 text-white text-sm font-mono px-5 py-4 rounded-2xl border border-white/5 focus:outline-none focus:border-purple-500/50 focus:bg-black/80 transition-all" />
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6 pt-8 border-t border-white/5">
+                        <div className="flex items-center gap-4">
+                            <button onClick={playAlarm} className="text-[10px] font-black text-purple-400 hover:text-white transition-colors uppercase tracking-[0.1em]">Test Acoustic Alarm</button>
+                        </div>
+                        <button onClick={handleTestAlert} disabled={!tgConfig.botToken || !tgConfig.chatId || testStatus === 'sending'}
+                            className="px-8 py-4 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all disabled:opacity-20 flex items-center gap-3">
+                            {testStatus === 'sending' ? <RefreshCcw className="w-4 h-4 animate-spin" /> :
+                                testStatus === 'ok' ? <CheckCircle className="w-4 h-4" /> :
+                                    testStatus === 'fail' ? <XCircle className="w-4 h-4" /> :
+                                        <Send className="w-4 h-4" />}
+                            {testStatus === 'ok' ? 'Handshake Success' : testStatus === 'fail' ? 'Handshake Failed' : 'Send Test Transmission'}
                         </button>
                     </div>
-                    <p className="text-[9px] text-gray-600 mt-3 font-bold">Create a bot via @BotFather on Telegram. Each user must /start the bot, then get their Chat ID via @userinfobot. Separate multiple IDs with commas.</p>
                 </div>
             )}
 
-            {/* Signal List */}
-            <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {/* Signal Grid - Premium Cards */}
+            <div className="flex-1 overflow-y-auto p-8 lg:p-12 custom-scrollbar">
+                <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-8">
                     {displaySignals.map((sig) => (
                         <button
                             key={sig.ticker.id}
                             onClick={() => onTickerClick(sig.ticker)}
-                            className="group relative flex flex-col p-5 bg-[#12141c] rounded-2xl border border-gray-800 hover:border-purple-500/50 transition-all duration-300 hover:shadow-[0_0_30px_rgba(168,85,247,0.1)] active:scale-[0.99]"
+                            className="group glass-card rounded-[2rem] p-7 flex flex-col text-left relative overflow-hidden"
                         >
-                            {/* Score Badge */}
-                            <div className="absolute top-4 right-4 flex flex-col items-end">
-                                <div className="text-[10px] font-black text-gray-500 uppercase mb-1">Buy Score</div>
-                                <div className="flex items-center gap-2">
-                                    <Trophy className={`w-4 h-4 ${sig.score > 90 ? 'text-yellow-500' : 'text-purple-400'}`} />
-                                    <span className="text-2xl font-black text-white italic">{sig.score.toFixed(0)}</span>
-                                </div>
-                                {sig.type === 'GOLDEN' && sig.activeSince && (
-                                    <span className="text-[9px] font-black text-amber-500/70 mt-1 uppercase tracking-tighter bg-amber-500/5 px-2 py-0.5 rounded border border-amber-500/10">
-                                        ⏱️ {Math.floor((currentTime - sig.activeSince) / 1000 / 60)}m {Math.floor((currentTime - sig.activeSince) / 1000) % 60}s
-                                    </span>
-                                )}
-                            </div>
+                            {/* Card Ambient Background */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-3xl rounded-full group-hover:bg-purple-600/15 transition-all duration-700"></div>
 
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-lg ${sig.type === 'GOLDEN' ? 'bg-yellow-500 text-black' :
-                                    sig.type === 'EXIT' ? 'bg-rose-600 text-white' :
-                                        sig.type === 'MOMENTUM' ? 'bg-purple-600 text-white' :
-                                            'bg-blue-600 text-white'
-                                    }`}>
-                                    {sig.ticker.symbol[0]}
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-white group-hover:text-purple-400 transition-colors uppercase tracking-tighter">
-                                        {sig.ticker.symbol} / USDT
-                                    </h3>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${sig.type === 'GOLDEN' ? 'bg-yellow-500/20 text-yellow-500' :
-                                            sig.type === 'EXIT' ? 'bg-rose-500/20 text-rose-500' :
-                                                sig.type === 'MOMENTUM' ? 'bg-purple-500/20 text-purple-400' :
-                                                    'bg-blue-500/20 text-blue-400'
-                                            }`}>
-                                            {sig.type} SIGNAL
-                                        </span>
+                            {/* Header Row */}
+                            <div className="flex items-start justify-between mb-8 relative z-10">
+                                <div className="flex items-center gap-5">
+                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl transition-all duration-500 group-hover:rotate-6 ${sig.type === 'GOLDEN' ? 'bg-gradient-to-br from-amber-400 to-orange-600 text-black shadow-amber-500/20' :
+                                            sig.type === 'MOMENTUM' ? 'bg-gradient-to-br from-purple-500 to-indigo-700 text-white shadow-purple-500/20' :
+                                                'bg-gradient-to-br from-blue-500 to-cyan-700 text-white'
+                                        }`}>
+                                        {sig.ticker.symbol[0]}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white group-hover:text-purple-400 transition-colors uppercase tracking-tight flex items-center gap-2">
+                                            {sig.ticker.symbol}
+                                            <span className="text-[10px] text-white/20 font-bold tracking-widest italic group-hover:text-purple-400/40">USDT</span>
+                                        </h3>
+                                        <div className="mt-1 flex items-center gap-2">
+                                            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${sig.type === 'GOLDEN' ? 'bg-amber-500' : 'bg-purple-500'}`}></div>
+                                            <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${sig.type === 'GOLDEN' ? 'text-amber-500' : 'text-purple-400'}`}>
+                                                {sig.type} SIGNAL ACTIVE
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
+
+                                <div className="flex flex-col items-end">
+                                    <div className="flex items-center gap-2.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl group-hover:border-purple-500/30 transition-colors">
+                                        <Trophy className={`w-4 h-4 ${sig.score > 90 ? 'text-amber-500' : 'text-purple-400'}`} />
+                                        <span className="text-2xl font-black text-white italic tracking-tighter">{sig.score.toFixed(0)}</span>
+                                    </div>
+                                    {sig.activeSince && (
+                                        <span className="text-[9px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">
+                                            ⏱️ {Math.floor((currentTime - sig.activeSince) / 1000 / 60)}m {Math.floor((currentTime - sig.activeSince) / 1000) % 60}s
+                                        </span>
+                                    )}
+                                </div>
                             </div>
 
-                            <div className="bg-black/40 rounded-xl p-4 border border-white/5 mb-4">
-                                <div className="flex items-center gap-2 mb-2">
+                            {/* AI Prediction Area */}
+                            <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/[0.04] mb-8 group-hover:bg-white/[0.05] transition-all relative z-10">
+                                <div className="flex items-center gap-2.5 mb-2.5">
                                     <ShieldCheck className="w-4 h-4 text-purple-400" />
-                                    <span className="text-xs font-black text-gray-300 uppercase tracking-widest">AI Verdict</span>
+                                    <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">AI Intelligence Verdict</span>
                                 </div>
-                                <p className="text-sm text-gray-400 leading-relaxed font-medium">
-                                    {sig.reason}
+                                <p className="text-sm text-white/70 leading-relaxed font-medium line-clamp-2 italic">
+                                    "{sig.reason}"
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-4">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-gray-600 uppercase mb-1">Price</span>
-                                    <span className="text-sm font-mono font-bold text-white">${formatPrice(sig.ticker.priceUsd)}</span>
+                            {/* Data Grid */}
+                            <div className="grid grid-cols-3 gap-6 mb-8 relative z-10">
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Mark Price</span>
+                                    <span className="text-base font-black text-white tracking-tight">${formatPrice(sig.ticker.priceUsd)}</span>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-gray-600 uppercase mb-1">Target (Max)</span>
-                                    <span className="text-sm font-mono font-bold text-green-400">${formatPrice(sig.vwap.max)}</span>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Bull Target</span>
+                                    <span className="text-base font-black text-emerald-400 tracking-tight">${formatPrice(sig.vwap.max)}</span>
                                 </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] font-black text-gray-600 uppercase mb-1">Stop (Mid)</span>
-                                    <span className="text-sm font-mono font-bold text-rose-400">${formatPrice(sig.vwap.mid)}</span>
+                                <div className="flex flex-col gap-1.5">
+                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Risk Guard</span>
+                                    <span className="text-base font-black text-rose-500/80 tracking-tight">${formatPrice(sig.vwap.mid)}</span>
                                 </div>
                             </div>
 
-                            <div className="mt-6 flex items-center justify-between">
+                            {/* Actions Footer */}
+                            <div className="mt-auto pt-6 border-t border-white/[0.05] flex items-center justify-between relative z-10">
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         onAddToWatchlist(sig.ticker);
                                     }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 text-blue-400 border border-blue-600/20 rounded-xl text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all"
+                                    className="px-4 py-2 hover:bg-white/5 text-white/40 hover:text-white rounded-xl text-[9px] font-black tracking-widest transition-all flex items-center gap-2.5 border border-transparent hover:border-white/10"
                                 >
-                                    <Star className="w-3 h-3" />
-                                    ADD TO WATCHLIST
+                                    <Star className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
+                                    WATCHLIST
                                 </button>
-                                <div className="flex items-center gap-1 text-purple-400 font-black text-xs group-hover:gap-2 transition-all uppercase">
-                                    Investigate <ArrowRight className="w-4 h-4" />
+                                <div className="flex items-center gap-2 bg-purple-500/5 px-4 py-2 rounded-xl group-hover:bg-purple-500/10 transition-all border border-purple-500/10">
+                                    <span className="text-xs font-black text-purple-400 tracking-wide uppercase italic">Analyze</span>
+                                    <ArrowRight className="w-4 h-4 text-purple-400 translate-x-0 group-hover:translate-x-1 transition-transform" />
                                 </div>
                             </div>
                         </button>
@@ -524,14 +537,14 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 </div>
 
                 {displaySignals.length === 0 && (
-                    <div className="flex flex-col items-center justify-center p-20 text-gray-500 italic">
-                        <Zap className="w-12 h-12 opacity-10 mb-4" />
-                        <p>Scanning markets for low-risk Golden Entry opportunities...</p>
+                    <div className="flex flex-col items-center justify-center p-32 text-white/10 italic animate-pulse-slow">
+                        <Zap className="w-16 h-16 mb-6 opacity-20" />
+                        <p className="text-sm font-black uppercase tracking-[0.3em]">Scanning Global Exchanges for Golden-Tier Probabilities...</p>
                     </div>
                 )}
             </div>
 
-            {/* ─── Golden Signal Performance Tracker ─── */}
+            {/* ─── Premium Signal Performance Tracker Slide-out/Footer ─── */}
             {trackedGoldens.length > 0 && (() => {
                 const winners = trackedGoldens.filter(t => ((t.lastPrice - t.entryPrice) / t.entryPrice) * 100 >= 0)
                     .sort((a, b) => ((b.lastPrice - b.entryPrice) / b.entryPrice) - ((a.lastPrice - a.entryPrice) / a.entryPrice));
@@ -547,7 +560,6 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     const minsAgo = Math.floor((elapsed % 3600000) / 60000);
                     const isPositive = pnl >= 0;
 
-                    // Sparkline logic (normalized price path)
                     const history = t.history || [t.entryPrice, t.lastPrice];
                     const minPrice = Math.min(...history);
                     const maxPrice = Math.max(...history);
@@ -559,63 +571,56 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     }).join(' ');
 
                     return (
-                        <div key={t.symbol} className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${t.stillActive
-                            ? isPositive ? 'bg-emerald-500/5 border-emerald-500/15 hover:border-emerald-500/30' : 'bg-rose-500/5 border-rose-500/15 hover:border-rose-500/30'
-                            : 'bg-gray-800/20 border-gray-800/40 opacity-70'
-                            }`}>
-                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${t.stillActive ? 'bg-yellow-500 text-black' : 'bg-gray-700 text-gray-400'
+                        <div key={t.symbol} className="flex items-center gap-5 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.04] transition-all group/row">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg ${t.stillActive ? 'bg-white text-black' : 'bg-white/10 text-white/30'
                                 }`}>
                                 {t.symbol[0]}
                             </div>
 
                             <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-black text-white uppercase tracking-tight">{t.symbol}</span>
-                                        {t.stillActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm font-black text-white uppercase tracking-tight italic">{t.symbol}</span>
+                                        {t.stillActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>}
                                     </div>
-                                    <span className="text-[8px] text-gray-600 font-bold uppercase">{hoursAgo}h {minsAgo}m ago</span>
+                                    <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">{hoursAgo}H {minsAgo}M IN</span>
                                 </div>
 
-                                <div className="flex items-center gap-4 mt-1.5">
+                                <div className="flex items-center gap-5">
                                     <div className="flex flex-col">
-                                        <span className="text-[8px] text-gray-600 font-black uppercase">Entry</span>
-                                        <span className="text-[10px] text-gray-400 font-mono">${formatPrice(t.entryPrice)}</span>
+                                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Entry</span>
+                                        <span className="text-[11px] text-white/80 font-mono font-bold">${formatPrice(t.entryPrice)}</span>
                                     </div>
-                                    <div className="flex-1 h-[30px] relative px-2">
-                                        <svg width="100%" height="30" viewBox="0 0 100 30" preserveAspectRatio="none" className="overflow-visible">
+                                    <div className="flex-1 h-[25px] relative group/spark">
+                                        <svg width="100%" height="25" viewBox="0 0 100 30" preserveAspectRatio="none" className="overflow-visible">
                                             <polyline
                                                 points={points}
                                                 fill="none"
                                                 stroke={isPositive ? '#10b981' : '#f43f5e'}
-                                                strokeWidth="1.5"
+                                                strokeWidth="2"
                                                 strokeLinecap="round"
                                                 strokeLinejoin="round"
-                                                className="opacity-40"
+                                                className="opacity-60 group-hover/spark:opacity-100 transition-opacity"
                                             />
-                                            {/* Take Profit Target Line (+5%) */}
-                                            <line x1="0" y1="0" x2="100" y2="0" stroke="#10b981" strokeWidth="0.5" strokeDasharray="2,2" className="opacity-10" />
-                                            {/* Stop Loss Target Line (-2%) */}
-                                            <line x1="0" y1="28" x2="100" y2="28" stroke="#f43f5e" strokeWidth="0.5" strokeDasharray="2,2" className="opacity-10" />
                                         </svg>
                                     </div>
                                     <div className="flex flex-col text-right">
-                                        <span className="text-[8px] text-gray-600 font-black uppercase">Now</span>
-                                        <span className={`text-[10px] font-mono ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>${formatPrice(t.lastPrice)}</span>
+                                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Latest</span>
+                                        <span className={`text-[11px] font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>${formatPrice(t.lastPrice)}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-5 shrink-0 pl-4 border-l border-gray-800/50">
+                            <div className="flex items-center gap-6 pl-6 border-l border-white/5">
                                 <div className="text-right">
-                                    <div className="text-[8px] font-black text-gray-600 uppercase">P&L</div>
-                                    <div className={`text-base font-black ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {isPositive ? '+' : ''}{pnl.toFixed(2)}%
+                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">P&L</div>
+                                    <div className={`text-lg font-black italic tracking-tighter ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {isPositive ? '+' : ''}{pnl.toFixed(1)}%
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-[8px] font-black text-gray-600 uppercase">Max</div>
-                                    <div className="text-sm font-black text-emerald-400">+{t.maxGainPct.toFixed(2)}%</div>
+                                <div className="text-right hidden sm:block">
+                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">PEAK</div>
+                                    <div className="text-sm font-black text-emerald-500 italic">+{t.maxGainPct.toFixed(1)}%</div>
                                 </div>
                             </div>
                         </div>
@@ -623,63 +628,62 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 };
 
                 return (
-                    <div className="border-t border-amber-500/20">
-                        {/* Header */}
-                        <div className="p-5 pb-3 flex items-center justify-between bg-gradient-to-r from-amber-900/10 to-transparent">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-amber-500/10 rounded-xl border border-amber-500/20">
-                                    <Target className="w-5 h-5 text-amber-400" />
+                    <div className="mt-8 border-t border-white/5 pt-12">
+                        {/* Tracker Global Stats */}
+                        <div className="mb-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8 px-2">
+                            <div className="flex items-center gap-5">
+                                <div className="w-16 h-16 rounded-[1.5rem] bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-2xl">
+                                    <Target className="w-8 h-8 text-amber-500" />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-black text-white uppercase tracking-tighter">Golden Signal Tracker — 24H</h3>
-                                    <p className="text-[9px] text-amber-400/50 font-bold uppercase tracking-widest">{trackedGoldens.length} Tokens Tracked • {winners.length} Winners • {losers.length} Losers</p>
+                                    <h3 className="text-2xl font-black text-white uppercase italic tracking-tighter">Live Benchmark</h3>
+                                    <div className="flex items-center gap-3 mt-1">
+                                        <p className="text-[10px] text-white/30 font-black uppercase tracking-[0.2em]">{trackedGoldens.length} Audited Transmissions (24H window)</p>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <div className="text-center px-3 py-1.5 bg-black/40 rounded-xl border border-gray-800">
-                                    <div className="text-[8px] font-black text-gray-600 uppercase">Avg P&L</div>
-                                    <span className={`text-sm font-black ${avgPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{avgPnl >= 0 ? '+' : ''}{avgPnl.toFixed(2)}%</span>
+
+                            <div className="flex items-center gap-4 bg-black/40 p-2 rounded-3xl border border-white/[0.03]">
+                                <div className="px-8 py-3 bg-white/5 rounded-2xl border border-white/5 group hover:border-emerald-500/30 transition-all">
+                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">Portfolio yield</div>
+                                    <span className={`text-xl font-black italic tracking-tighter ${avgPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{avgPnl >= 0 ? '+' : ''}{avgPnl.toFixed(2)}%</span>
                                 </div>
-                                <div className="text-center px-3 py-1.5 bg-black/40 rounded-xl border border-gray-800">
-                                    <div className="text-[8px] font-black text-gray-600 uppercase">Win Rate</div>
-                                    <span className={`text-sm font-black ${winRate >= 50 ? 'text-emerald-400' : 'text-rose-400'}`}>{winRate.toFixed(0)}%</span>
+                                <div className="px-8 py-3 bg-white/5 rounded-2xl border border-white/5 group hover:border-amber-500/30 transition-all">
+                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">Signal Fidelity</div>
+                                    <span className={`text-xl font-black italic tracking-tighter ${winRate >= 50 ? 'text-amber-500' : 'text-rose-400'}`}>{winRate.toFixed(0)}%</span>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-0">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-12">
                             {/* WINNERS Column */}
-                            <div className="border-r border-gray-800/50">
-                                <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/5 border-b border-emerald-500/10">
-                                    <TrendingUp className="w-4 h-4 text-emerald-400" />
-                                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Winners ({winners.length})</span>
-                                    {winners.length > 0 && (
-                                        <span className="ml-auto text-[10px] font-black text-emerald-400">
-                                            +{(winners.reduce((s, t) => s + ((t.lastPrice - t.entryPrice) / t.entryPrice) * 100, 0) / winners.length).toFixed(2)}% avg
-                                        </span>
-                                    )}
+                            <div>
+                                <div className="flex items-center justify-between mb-6 px-4">
+                                    <div className="flex items-center gap-3">
+                                        <TrendingUp className="w-5 h-5 text-emerald-500" />
+                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em]">Alpha Stream (Gainers)</span>
+                                    </div>
+                                    <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">{winners.length} Pairs</span>
                                 </div>
-                                <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar">
+                                <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
                                     {winners.length > 0 ? winners.map(renderRow) : (
-                                        <div className="flex items-center justify-center p-8 text-gray-600 italic text-xs">No winners yet</div>
+                                        <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">Awaiting Alpha Confirmations...</div>
                                     )}
                                 </div>
                             </div>
 
                             {/* LOSERS Column */}
                             <div>
-                                <div className="flex items-center gap-2 px-4 py-2.5 bg-rose-500/5 border-b border-rose-500/10">
-                                    <TrendingDown className="w-4 h-4 text-rose-400" />
-                                    <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Losers ({losers.length})</span>
-                                    {losers.length > 0 && (
-                                        <span className="ml-auto text-[10px] font-black text-rose-400">
-                                            {(losers.reduce((s, t) => s + ((t.lastPrice - t.entryPrice) / t.entryPrice) * 100, 0) / losers.length).toFixed(2)}% avg
-                                        </span>
-                                    )}
+                                <div className="flex items-center justify-between mb-6 px-4">
+                                    <div className="flex items-center gap-3">
+                                        <TrendingDown className="w-5 h-5 text-rose-500" />
+                                        <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em]">Risk Stream (Drawdown)</span>
+                                    </div>
+                                    <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full">{losers.length} Pairs</span>
                                 </div>
-                                <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar">
+                                <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
                                     {losers.length > 0 ? losers.map(renderRow) : (
-                                        <div className="flex items-center justify-center p-8 text-gray-600 italic text-xs">No losers — all winning! 🎯</div>
+                                        <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">No Negative Variance Detected 🎯</div>
                                     )}
                                 </div>
                             </div>
@@ -688,13 +692,17 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 );
             })()}
 
-            {/* Footer Notice */}
-            <div className="p-4 bg-purple-900/5 border-t border-purple-500/10 flex items-center gap-3">
-                <Info className="w-4 h-4 text-purple-400" />
-                <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                    AI Signals are for educational purposes. Always verify Liquidity Flow & CVD before entering a trade.
-                </span>
-            </div>
+            {/* Corporate Legal Footer */}
+            <footer className="mt-20 py-12 border-t border-white/[0.03] flex flex-col items-center gap-5">
+                <div className="flex items-center gap-4 opacity-20 hover:opacity-100 transition-opacity">
+                    <ShieldCheck className="w-5 h-5 text-purple-500" />
+                    <div className="w-px h-6 bg-white/20"></div>
+                    <p className="text-[9px] font-black text-white uppercase tracking-[0.5em]">Quantitative Analysis v1.0.4-Stable</p>
+                </div>
+                <p className="text-[8px] text-white/10 font-bold max-w-2xl text-center leading-loose uppercase tracking-[0.1em]">
+                    This terminal is designed for advanced traders. VWAP indicators and Neural signals are calculated based on historical structural data. Market risk is high. Continuous synchronization with global liquidity is not guaranteed.
+                </p>
+            </footer>
         </div>
     );
 };
