@@ -40,8 +40,6 @@ function App() {
 
     const fetchSignals = async () => {
       setVwapLoading(true);
-      const newVwapStore: Record<string, VwapData> = { ...vwapStore };
-      const newFirstSeen: Record<string, number> = { ...firstSeenTimes };
 
       const CHUNK_SIZE = 15; // Increased from 5
       const DELAY_MS = 200; // Reduced from 600
