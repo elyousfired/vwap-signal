@@ -16,7 +16,11 @@ interface TrackedGolden {
     maxGainPct: number;
     lastPrice: number;
     stillActive: boolean;
-    history?: number[]; // Added for sparklines
+    history?: number[];
+    exitPrice?: number;
+    exitTime?: number;
+    realizedPnl?: number;
+    wasActive?: boolean; // Added to distinguish between 'not yet golden' and 'exhausted golden'
 }
 
 const GOLDEN_TRACKER_KEY = 'dexpulse_golden_tracker';
@@ -145,8 +149,9 @@ const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClic
 
 // ─── Memoized Performance Row ───────────────
 const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ t, currentTime }) => {
-    const pnl = ((t.lastPrice - t.entryPrice) / t.entryPrice) * 100;
-    const elapsed = currentTime - t.signalTime;
+    const isClosed = !!t.exitTime;
+    const pnl = isClosed ? (t.realizedPnl || 0) : (((t.lastPrice - t.entryPrice) / t.entryPrice) * 100);
+    const elapsed = (isClosed ? t.exitTime! : currentTime) - t.signalTime;
     const hoursAgo = Math.floor(elapsed / 3600000);
     const minsAgo = Math.floor((elapsed % 3600000) / 60000);
     const isPositive = pnl >= 0;
@@ -162,8 +167,8 @@ const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ 
     }).join(' ');
 
     return (
-        <div className="flex items-center gap-5 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.04] transition-all group/row">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg ${t.stillActive ? 'bg-white text-black' : 'bg-white/10 text-white/30'}`}>
+        <div className={`flex items-center gap-5 p-4 rounded-2xl border transition-all group/row ${isClosed ? 'bg-black/40 border-white/[0.02] opacity-80 hover:opacity-100' : 'bg-white/[0.02] border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.04]'}`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg ${t.stillActive ? 'bg-white text-black' : isClosed ? 'bg-purple-900/40 text-purple-300' : 'bg-white/10 text-white/30'}`}>
                 {t.symbol[0]}
             </div>
 
@@ -172,8 +177,11 @@ const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ 
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-black text-white uppercase tracking-tight italic">{t.symbol}</span>
                         {t.stillActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>}
+                        {isClosed && <span className="text-[7px] bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-white/40 font-black tracking-widest uppercase">REALIZED</span>}
                     </div>
-                    <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">{hoursAgo}H {minsAgo}M IN</span>
+                    <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">
+                        {isClosed ? 'Trade Duration: ' : ''}{hoursAgo > 0 ? `${hoursAgo}H ` : ''}{minsAgo}M
+                    </span>
                 </div>
 
                 <div className="flex items-center gap-5">
@@ -181,22 +189,31 @@ const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ 
                         <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Entry</span>
                         <span className="text-[11px] text-white/80 font-mono font-bold">${formatPrice(t.entryPrice)}</span>
                     </div>
-                    <div className="flex-1 h-[25px] relative group/spark">
-                        <svg width="100%" height="25" viewBox="0 0 100 30" preserveAspectRatio="none" className="overflow-visible">
-                            <polyline
-                                points={points}
-                                fill="none"
-                                stroke={isPositive ? '#10b981' : '#f43f5e'}
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="opacity-60 group-hover/spark:opacity-100 transition-opacity"
-                            />
-                        </svg>
-                    </div>
+                    {!isClosed && (
+                        <div className="flex-1 h-[25px] relative group/spark">
+                            <svg width="100%" height="25" viewBox="0 0 100 30" preserveAspectRatio="none" className="overflow-visible">
+                                <polyline
+                                    points={points}
+                                    fill="none"
+                                    stroke={isPositive ? '#10b981' : '#f43f5e'}
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="opacity-60 group-hover/spark:opacity-100 transition-opacity"
+                                />
+                            </svg>
+                        </div>
+                    )}
+                    {isClosed && (
+                        <div className="flex-1 flex items-center justify-center gap-2">
+                            <div className="h-px bg-white/5 flex-1"></div>
+                            <XCircle className="w-3 h-3 text-white/20" />
+                            <div className="h-px bg-white/5 flex-1"></div>
+                        </div>
+                    )}
                     <div className="flex flex-col text-right">
-                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Latest</span>
-                        <span className={`text-[11px] font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>${formatPrice(t.lastPrice)}</span>
+                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">{isClosed ? 'Exit' : 'Latest'}</span>
+                        <span className={`text-[11px] font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>${formatPrice(isClosed ? t.exitPrice! : t.lastPrice)}</span>
                     </div>
                 </div>
             </div>
@@ -207,10 +224,6 @@ const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ 
                     <div className={`text-lg font-black italic tracking-tighter ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {isPositive ? '+' : ''}{pnl.toFixed(1)}%
                     </div>
-                </div>
-                <div className="text-right hidden sm:block">
-                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">PEAK</div>
-                    <div className="text-sm font-black text-emerald-500 italic">+{t.maxGainPct.toFixed(1)}%</div>
                 </div>
             </div>
         </div>
@@ -430,22 +443,47 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                         maxGainPct: 0,
                         lastPrice: sig.ticker.priceUsd,
                         stillActive: true,
+                        wasActive: true,
                         history: [sig.ticker.priceUsd]
                     });
+                } else if (!existing.stillActive && !existing.exitTime) {
+                    // Re-activate if it was just waiting/fresh and didn't close yet
+                    existing.stillActive = true;
+                    existing.wasActive = true;
                 }
             });
 
             // 2. Update all tracked entries with current prices
             updated = updated.map((t: TrackedGolden) => {
+                // If already closed, don't update lastPrice or PnL
+                if (t.exitTime) return t;
+
                 const ticker = tickers.find((tk: CexTicker) => tk.symbol === t.symbol);
                 if (!ticker) return t;
 
+                const isCurrentlyGolden = goldenSymbols.has(t.symbol);
                 const currentPrice = ticker.priceUsd;
+
+                // Detect EXIT: was active golden, but now is not
+                if (t.stillActive && !isCurrentlyGolden) {
+                    const finalPnl = ((currentPrice - t.entryPrice) / t.entryPrice) * 100;
+                    return {
+                        ...t,
+                        lastPrice: currentPrice,
+                        stillActive: false,
+                        exitPrice: currentPrice,
+                        exitTime: Date.now(),
+                        realizedPnl: finalPnl,
+                        maxPrice: Math.max(t.maxPrice, currentPrice),
+                        maxGainPct: Math.max(t.maxGainPct, finalPnl)
+                    };
+                }
+
                 const pnl = ((currentPrice - t.entryPrice) / t.entryPrice) * 100;
                 const newMax = Math.max(t.maxPrice, currentPrice);
                 const newMaxGain = Math.max(t.maxGainPct, pnl);
 
-                // Update history every 10 minutes (limit to 144 points for 24h)
+                // Update history every 10 minutes
                 const history = t.history || [t.entryPrice];
                 const shouldAddPoint = history.length < 144 && (Date.now() - (t.signalTime + (history.length - 1) * 10 * 60 * 1000) > 10 * 60 * 1000);
 
@@ -454,7 +492,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     lastPrice: currentPrice,
                     maxPrice: newMax,
                     maxGainPct: newMaxGain,
-                    stillActive: goldenSymbols.has(t.symbol),
+                    stillActive: isCurrentlyGolden,
                     history: shouldAddPoint ? [...history, currentPrice] : history
                 };
             });
@@ -670,7 +708,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                                     <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">{winners.length} Pairs</span>
                                 </div>
                                 <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
-                                    {winners.length > 0 ? winners.map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
+                                    {winners.length > 0 ? winners.filter(t => !t.exitTime).map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
                                         <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">Awaiting Alpha Confirmations...</div>
                                     )}
                                 </div>
@@ -686,10 +724,53 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                                     <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full">{losers.length} Pairs</span>
                                 </div>
                                 <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
-                                    {losers.length > 0 ? losers.map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
+                                    {losers.length > 0 ? losers.filter(t => !t.exitTime).map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
                                         <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">No Negative Variance Detected 🎯</div>
                                     )}
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* ─── REALIZED GAINS SECTION ─── */}
+                        <div className="mt-16 bg-black/40 rounded-[2.5rem] p-10 border border-white/[0.03] relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/5 blur-[100px] rounded-full"></div>
+                            <div className="flex items-center justify-between mb-10 relative z-10">
+                                <div className="flex items-center gap-5">
+                                    <div className="w-14 h-14 rounded-2xl bg-white text-black flex items-center justify-center shadow-xl">
+                                        <ShieldCheck className="w-7 h-7" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black text-white uppercase italic tracking-tighter">Realized Neural Gains</h3>
+                                        <p className="text-[9px] text-white/20 font-black uppercase tracking-[0.3em]">Historical Performance Vault (24H window)</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    {(() => {
+                                        const realizedTrades = trackedGoldens.filter(t => t.exitTime);
+                                        const netRealized = realizedTrades.reduce((s, t) => s + (t.realizedPnl || 0), 0);
+                                        return (
+                                            <div className="px-6 py-3 bg-white/5 rounded-2xl border border-white/10">
+                                                <span className="block text-[8px] font-black text-white/30 uppercase tracking-widest mb-1 text-right">Net Realized</span>
+                                                <span className={`text-lg font-black italic tracking-tighter ${netRealized >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {netRealized >= 0 ? '+' : ''}{netRealized.toFixed(2)}%
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-6 relative z-10">
+                                {trackedGoldens.filter(t => t.exitTime).length > 0 ? (
+                                    trackedGoldens
+                                        .filter(t => t.exitTime)
+                                        .sort((a, b) => (b.exitTime || 0) - (a.exitTime || 0))
+                                        .map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />)
+                                ) : (
+                                    <div className="col-span-full h-32 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-3xl opacity-20 group">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.4em] group-hover:tracking-[0.6em] transition-all">Vault Empty - No Neural Trades Finalized Yet</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
