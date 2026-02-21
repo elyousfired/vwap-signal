@@ -43,8 +43,12 @@ function App() {
       const newVwapStore: Record<string, VwapData> = { ...vwapStore };
       const newFirstSeen: Record<string, number> = { ...firstSeenTimes };
 
-      const CHUNK_SIZE = 5;
-      const DELAY_MS = 600;
+      const CHUNK_SIZE = 15; // Increased from 5
+      const DELAY_MS = 200; // Reduced from 600
+
+      // Batch updates to reduce re-renders
+      let pendingVwapStore = { ...vwapStore };
+      let pendingFirstSeen = { ...firstSeenTimes };
 
       for (let i = 0; i < mainTickers.length; i += CHUNK_SIZE) {
         if (cancelled) break;
@@ -54,17 +58,18 @@ function App() {
           try {
             const data = await fetchWeeklyVwapData(t.symbol);
             if (data) {
-              newVwapStore[t.id] = data;
-              if (!newFirstSeen[t.id]) {
-                newFirstSeen[t.id] = Date.now();
+              pendingVwapStore[t.id] = data;
+              if (!pendingFirstSeen[t.id]) {
+                pendingFirstSeen[t.id] = Date.now();
               }
             }
           } catch (e) { }
         }));
 
-        if (!cancelled) {
-          setVwapStore({ ...newVwapStore });
-          setFirstSeenTimes({ ...newFirstSeen });
+        // Intermediate batch update for UX
+        if (!cancelled && (i % 30 === 0 || i + CHUNK_SIZE >= mainTickers.length)) {
+          setVwapStore({ ...pendingVwapStore });
+          setFirstSeenTimes({ ...pendingFirstSeen });
         }
 
         if (i + CHUNK_SIZE < mainTickers.length) {

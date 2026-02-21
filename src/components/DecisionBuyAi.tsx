@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import type { CexTicker, VwapData } from '../types';
 import { formatPrice } from '../services/cexService';
@@ -39,23 +39,165 @@ function saveTrackedGoldens(data: TrackedGolden[]) {
     localStorage.setItem(GOLDEN_TRACKER_KEY, JSON.stringify(filtered));
 }
 
-interface DecisionBuyAiProps {
-    tickers: CexTicker[];
-    vwapStore: Record<string, VwapData>;
-    firstSeenTimes: Record<string, number>;
-    isLoading: boolean;
+// ─── Memoized Signal Card ─────────────────
+interface SignalCardProps {
+    sig: BuySignal;
+    currentTime: number;
     onTickerClick: (ticker: CexTicker) => void;
     onAddToWatchlist: (ticker: CexTicker) => void;
 }
 
-interface BuySignal {
-    ticker: CexTicker;
-    vwap: VwapData;
-    score: number;
-    reason: string;
-    type: 'GOLDEN' | 'MOMENTUM' | 'SUPPORT' | 'EXIT';
-    activeSince?: number; // timestamp
-}
+const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClick, onAddToWatchlist }) => (
+    <button
+        onClick={() => onTickerClick(sig.ticker)}
+        className="group glass-card rounded-[2rem] p-7 flex flex-col text-left relative overflow-hidden"
+    >
+        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-3xl rounded-full group-hover:bg-purple-600/15 transition-all duration-700"></div>
+        <div className="flex items-start justify-between mb-8 relative z-10">
+            <div className="flex items-center gap-5">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl transition-all duration-500 group-hover:rotate-6 ${sig.type === 'GOLDEN' ? 'bg-gradient-to-br from-amber-400 to-orange-600 text-black shadow-amber-500/20' :
+                    sig.type === 'MOMENTUM' ? 'bg-gradient-to-br from-purple-500 to-indigo-700 text-white shadow-purple-500/20' :
+                        'bg-gradient-to-br from-blue-500 to-cyan-700 text-white'
+                    }`}>
+                    {sig.ticker.symbol[0]}
+                </div>
+                <div>
+                    <h3 className="text-xl font-black text-white group-hover:text-purple-400 transition-colors uppercase tracking-tight flex items-center gap-2">
+                        {sig.ticker.symbol}
+                        <span className="text-[10px] text-white/20 font-bold tracking-widest italic group-hover:text-purple-400/40">USDT</span>
+                    </h3>
+                    <div className="mt-1 flex items-center gap-2">
+                        <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${sig.type === 'GOLDEN' ? 'bg-amber-500' : 'bg-purple-500'}`}></div>
+                        <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${sig.type === 'GOLDEN' ? 'text-amber-500' : 'text-purple-400'}`}>
+                            {sig.type} SIGNAL ACTIVE
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div className="flex flex-col items-end">
+                <div className="flex items-center gap-2.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl group-hover:border-purple-500/30 transition-colors">
+                    <Trophy className={`w-4 h-4 ${sig.score > 90 ? 'text-amber-500' : 'text-purple-400'}`} />
+                    <span className="text-2xl font-black text-white italic tracking-tighter">{sig.score.toFixed(0)}</span>
+                </div>
+                {sig.activeSince && (
+                    <span className="text-[9px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">
+                        ⏱️ {Math.floor((currentTime - sig.activeSince) / 1000 / 60)}m {Math.floor((currentTime - sig.activeSince) / 1000) % 60}s
+                    </span>
+                )}
+            </div>
+        </div>
+        <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/[0.04] mb-8 group-hover:bg-white/[0.05] transition-all relative z-10">
+            <div className="flex items-center gap-2.5 mb-2.5">
+                <ShieldCheck className="w-4 h-4 text-purple-400" />
+                <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">AI Intelligence Verdict</span>
+            </div>
+            <p className="text-sm text-white/70 leading-relaxed font-medium line-clamp-2 italic">
+                "{sig.reason}"
+            </p>
+        </div>
+        <div className="grid grid-cols-3 gap-6 mb-8 relative z-10">
+            <div className="flex flex-col gap-1.5">
+                <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Mark Price</span>
+                <span className="text-base font-black text-white tracking-tight">${formatPrice(sig.ticker.priceUsd)}</span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+                <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Bull Target</span>
+                <span className="text-base font-black text-emerald-400 tracking-tight">${formatPrice(sig.vwap.max)}</span>
+            </div>
+            <div className="flex flex-col gap-1.5">
+                <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Risk Guard</span>
+                <span className="text-base font-black text-rose-500/80 tracking-tight">${formatPrice(sig.vwap.mid)}</span>
+            </div>
+        </div>
+        <div className="mt-auto pt-6 border-t border-white/[0.05] flex items-center justify-between relative z-10">
+            <button
+                onClick={(e) => { e.stopPropagation(); onAddToWatchlist(sig.ticker); }}
+                className="px-4 py-2 hover:bg-white/5 text-white/40 hover:text-white rounded-xl text-[9px] font-black tracking-widest transition-all flex items-center gap-2.5 border border-transparent hover:border-white/10"
+            >
+                <Star className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
+                WATCHLIST
+            </button>
+            <div className="flex items-center gap-2 bg-purple-500/5 px-4 py-2 rounded-xl group-hover:bg-purple-500/10 transition-all border border-purple-500/10">
+                <span className="text-xs font-black text-purple-400 tracking-wide uppercase italic">Analyze</span>
+                <ArrowRight className="w-4 h-4 text-purple-400 translate-x-0 group-hover:translate-x-1 transition-transform" />
+            </div>
+        </div>
+    </button>
+));
+
+// ─── Memoized Performance Row ───────────────
+const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ t, currentTime }) => {
+    const pnl = ((t.lastPrice - t.entryPrice) / t.entryPrice) * 100;
+    const elapsed = currentTime - t.signalTime;
+    const hoursAgo = Math.floor(elapsed / 3600000);
+    const minsAgo = Math.floor((elapsed % 3600000) / 60000);
+    const isPositive = pnl >= 0;
+
+    const history = t.history || [t.entryPrice, t.lastPrice];
+    const minPrice = Math.min(...history);
+    const maxPrice = Math.max(...history);
+    const range = (maxPrice - minPrice) || (t.entryPrice * 0.01);
+    const points = history.map((p, i) => {
+        const x = (i / Math.max(1, history.length - 1)) * 100;
+        const y = 30 - ((p - minPrice) / range) * 25;
+        return `${x},${y}`;
+    }).join(' ');
+
+    return (
+        <div className="flex items-center gap-5 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.04] transition-all group/row">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg ${t.stillActive ? 'bg-white text-black' : 'bg-white/10 text-white/30'}`}>
+                {t.symbol[0]}
+            </div>
+
+            <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-3">
+                        <span className="text-sm font-black text-white uppercase tracking-tight italic">{t.symbol}</span>
+                        {t.stillActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>}
+                    </div>
+                    <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">{hoursAgo}H {minsAgo}M IN</span>
+                </div>
+
+                <div className="flex items-center gap-5">
+                    <div className="flex flex-col">
+                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Entry</span>
+                        <span className="text-[11px] text-white/80 font-mono font-bold">${formatPrice(t.entryPrice)}</span>
+                    </div>
+                    <div className="flex-1 h-[25px] relative group/spark">
+                        <svg width="100%" height="25" viewBox="0 0 100 30" preserveAspectRatio="none" className="overflow-visible">
+                            <polyline
+                                points={points}
+                                fill="none"
+                                stroke={isPositive ? '#10b981' : '#f43f5e'}
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="opacity-60 group-hover/spark:opacity-100 transition-opacity"
+                            />
+                        </svg>
+                    </div>
+                    <div className="flex flex-col text-right">
+                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Latest</span>
+                        <span className={`text-[11px] font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>${formatPrice(t.lastPrice)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-6 pl-6 border-l border-white/5">
+                <div className="text-right">
+                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">P&L</div>
+                    <div className={`text-lg font-black italic tracking-tighter ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {isPositive ? '+' : ''}{pnl.toFixed(1)}%
+                    </div>
+                </div>
+                <div className="text-right hidden sm:block">
+                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">PEAK</div>
+                    <div className="text-sm font-black text-emerald-500 italic">+{t.maxGainPct.toFixed(1)}%</div>
+                </div>
+            </div>
+        </div>
+    );
+});
 
 export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
     tickers,
@@ -444,95 +586,13 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             <div className="flex-1 overflow-y-auto p-8 lg:p-12 custom-scrollbar">
                 <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-8">
                     {displaySignals.map((sig) => (
-                        <button
+                        <SignalCard
                             key={sig.ticker.id}
-                            onClick={() => onTickerClick(sig.ticker)}
-                            className="group glass-card rounded-[2rem] p-7 flex flex-col text-left relative overflow-hidden"
-                        >
-                            {/* Card Ambient Background */}
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-3xl rounded-full group-hover:bg-purple-600/15 transition-all duration-700"></div>
-
-                            {/* Header Row */}
-                            <div className="flex items-start justify-between mb-8 relative z-10">
-                                <div className="flex items-center gap-5">
-                                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-xl shadow-2xl transition-all duration-500 group-hover:rotate-6 ${sig.type === 'GOLDEN' ? 'bg-gradient-to-br from-amber-400 to-orange-600 text-black shadow-amber-500/20' :
-                                        sig.type === 'MOMENTUM' ? 'bg-gradient-to-br from-purple-500 to-indigo-700 text-white shadow-purple-500/20' :
-                                            'bg-gradient-to-br from-blue-500 to-cyan-700 text-white'
-                                        }`}>
-                                        {sig.ticker.symbol[0]}
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-black text-white group-hover:text-purple-400 transition-colors uppercase tracking-tight flex items-center gap-2">
-                                            {sig.ticker.symbol}
-                                            <span className="text-[10px] text-white/20 font-bold tracking-widest italic group-hover:text-purple-400/40">USDT</span>
-                                        </h3>
-                                        <div className="mt-1 flex items-center gap-2">
-                                            <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${sig.type === 'GOLDEN' ? 'bg-amber-500' : 'bg-purple-500'}`}></div>
-                                            <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${sig.type === 'GOLDEN' ? 'text-amber-500' : 'text-purple-400'}`}>
-                                                {sig.type} SIGNAL ACTIVE
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col items-end">
-                                    <div className="flex items-center gap-2.5 px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl group-hover:border-purple-500/30 transition-colors">
-                                        <Trophy className={`w-4 h-4 ${sig.score > 90 ? 'text-amber-500' : 'text-purple-400'}`} />
-                                        <span className="text-2xl font-black text-white italic tracking-tighter">{sig.score.toFixed(0)}</span>
-                                    </div>
-                                    {sig.activeSince && (
-                                        <span className="text-[9px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">
-                                            ⏱️ {Math.floor((currentTime - sig.activeSince) / 1000 / 60)}m {Math.floor((currentTime - sig.activeSince) / 1000) % 60}s
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* AI Prediction Area */}
-                            <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/[0.04] mb-8 group-hover:bg-white/[0.05] transition-all relative z-10">
-                                <div className="flex items-center gap-2.5 mb-2.5">
-                                    <ShieldCheck className="w-4 h-4 text-purple-400" />
-                                    <span className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em]">AI Intelligence Verdict</span>
-                                </div>
-                                <p className="text-sm text-white/70 leading-relaxed font-medium line-clamp-2 italic">
-                                    "{sig.reason}"
-                                </p>
-                            </div>
-
-                            {/* Data Grid */}
-                            <div className="grid grid-cols-3 gap-6 mb-8 relative z-10">
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Mark Price</span>
-                                    <span className="text-base font-black text-white tracking-tight">${formatPrice(sig.ticker.priceUsd)}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Bull Target</span>
-                                    <span className="text-base font-black text-emerald-400 tracking-tight">${formatPrice(sig.vwap.max)}</span>
-                                </div>
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest">Risk Guard</span>
-                                    <span className="text-base font-black text-rose-500/80 tracking-tight">${formatPrice(sig.vwap.mid)}</span>
-                                </div>
-                            </div>
-
-                            {/* Actions Footer */}
-                            <div className="mt-auto pt-6 border-t border-white/[0.05] flex items-center justify-between relative z-10">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onAddToWatchlist(sig.ticker);
-                                    }}
-                                    className="px-4 py-2 hover:bg-white/5 text-white/40 hover:text-white rounded-xl text-[9px] font-black tracking-widest transition-all flex items-center gap-2.5 border border-transparent hover:border-white/10"
-                                >
-                                    <Star className="w-3.5 h-3.5 transition-transform group-hover:scale-110" />
-                                    WATCHLIST
-                                </button>
-                                <div className="flex items-center gap-2 bg-purple-500/5 px-4 py-2 rounded-xl group-hover:bg-purple-500/10 transition-all border border-purple-500/10">
-                                    <span className="text-xs font-black text-purple-400 tracking-wide uppercase italic">Analyze</span>
-                                    <ArrowRight className="w-4 h-4 text-purple-400 translate-x-0 group-hover:translate-x-1 transition-transform" />
-                                </div>
-                            </div>
-                        </button>
+                            sig={sig}
+                            currentTime={currentTime}
+                            onTickerClick={onTickerClick}
+                            onAddToWatchlist={onAddToWatchlist}
+                        />
                     ))}
                 </div>
 
@@ -552,80 +612,6 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     .sort((a, b) => ((a.lastPrice - a.entryPrice) / a.entryPrice) - ((b.lastPrice - b.entryPrice) / b.entryPrice));
                 const avgPnl = trackedGoldens.reduce((s, t) => s + ((t.lastPrice - t.entryPrice) / t.entryPrice) * 100, 0) / trackedGoldens.length;
                 const winRate = (winners.length / trackedGoldens.length) * 100;
-
-                const renderRow = (t: TrackedGolden) => {
-                    const pnl = ((t.lastPrice - t.entryPrice) / t.entryPrice) * 100;
-                    const elapsed = currentTime - t.signalTime;
-                    const hoursAgo = Math.floor(elapsed / 3600000);
-                    const minsAgo = Math.floor((elapsed % 3600000) / 60000);
-                    const isPositive = pnl >= 0;
-
-                    const history = t.history || [t.entryPrice, t.lastPrice];
-                    const minPrice = Math.min(...history);
-                    const maxPrice = Math.max(...history);
-                    const range = (maxPrice - minPrice) || (t.entryPrice * 0.01);
-                    const points = history.map((p, i) => {
-                        const x = (i / Math.max(1, history.length - 1)) * 100;
-                        const y = 30 - ((p - minPrice) / range) * 25;
-                        return `${x},${y}`;
-                    }).join(' ');
-
-                    return (
-                        <div key={t.symbol} className="flex items-center gap-5 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.04] transition-all group/row">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg ${t.stillActive ? 'bg-white text-black' : 'bg-white/10 text-white/30'
-                                }`}>
-                                {t.symbol[0]}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1.5">
-                                    <div className="flex items-center gap-3">
-                                        <span className="text-sm font-black text-white uppercase tracking-tight italic">{t.symbol}</span>
-                                        {t.stillActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>}
-                                    </div>
-                                    <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">{hoursAgo}H {minsAgo}M IN</span>
-                                </div>
-
-                                <div className="flex items-center gap-5">
-                                    <div className="flex flex-col">
-                                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Entry</span>
-                                        <span className="text-[11px] text-white/80 font-mono font-bold">${formatPrice(t.entryPrice)}</span>
-                                    </div>
-                                    <div className="flex-1 h-[25px] relative group/spark">
-                                        <svg width="100%" height="25" viewBox="0 0 100 30" preserveAspectRatio="none" className="overflow-visible">
-                                            <polyline
-                                                points={points}
-                                                fill="none"
-                                                stroke={isPositive ? '#10b981' : '#f43f5e'}
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                                className="opacity-60 group-hover/spark:opacity-100 transition-opacity"
-                                            />
-                                        </svg>
-                                    </div>
-                                    <div className="flex flex-col text-right">
-                                        <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">Latest</span>
-                                        <span className={`text-[11px] font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>${formatPrice(t.lastPrice)}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-6 pl-6 border-l border-white/5">
-                                <div className="text-right">
-                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">P&L</div>
-                                    <div className={`text-lg font-black italic tracking-tighter ${isPositive ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {isPositive ? '+' : ''}{pnl.toFixed(1)}%
-                                    </div>
-                                </div>
-                                <div className="text-right hidden sm:block">
-                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">PEAK</div>
-                                    <div className="text-sm font-black text-emerald-500 italic">+{t.maxGainPct.toFixed(1)}%</div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                };
 
                 return (
                     <div className="mt-8 border-t border-white/5 pt-12">
@@ -666,7 +652,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                                     <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">{winners.length} Pairs</span>
                                 </div>
                                 <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
-                                    {winners.length > 0 ? winners.map(renderRow) : (
+                                    {winners.length > 0 ? winners.map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
                                         <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">Awaiting Alpha Confirmations...</div>
                                     )}
                                 </div>
@@ -682,7 +668,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                                     <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full">{losers.length} Pairs</span>
                                 </div>
                                 <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
-                                    {losers.length > 0 ? losers.map(renderRow) : (
+                                    {losers.length > 0 ? losers.map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
                                         <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">No Negative Variance Detected 🎯</div>
                                     )}
                                 </div>
@@ -703,6 +689,6 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     This terminal is designed for advanced traders. VWAP indicators and Neural signals are calculated based on historical structural data. Market risk is high. Continuous synchronization with global liquidity is not guaranteed.
                 </p>
             </footer>
-        </div>
+        </div >
     );
 };

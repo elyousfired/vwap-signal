@@ -355,7 +355,7 @@ export async function fetchBinanceKlines(
 
 // Standard cache with short TTL for live updates
 const vwapCache: Map<string, { data: VwapData, expires: number }> = new Map();
-const VWAP_CACHE_TTL = 1000 * 60 * 1; // 1 minute for fresh slope/mid values
+const VWAP_CACHE_TTL = 1000 * 60 * 5; // Increased to 5 minutes for stable structural data
 
 export async function fetchWeeklyVwapData(symbol: string): Promise<VwapData | null> {
     const cached = vwapCache.get(symbol);
