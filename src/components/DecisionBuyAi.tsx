@@ -22,10 +22,29 @@ interface TrackedGolden {
     exitTime?: number;
     realizedPnl?: number;
     wasActive?: boolean; // Added to distinguish between 'not yet golden' and 'exhausted golden'
+    wasCounted?: boolean;
+    tpHit?: boolean;
 }
 
+interface GoldenStats {
+    totalSignals: number;
+    successHits: number;
+}
+
+const STAT_KEY = 'dexpulse_golden_stats';
 const GOLDEN_TRACKER_KEY = 'dexpulse_golden_tracker';
 const TRACKER_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+function loadGoldenStats(): GoldenStats {
+    try {
+        const raw = localStorage.getItem(STAT_KEY);
+        return raw ? JSON.parse(raw) : { totalSignals: 0, successHits: 0 };
+    } catch { return { totalSignals: 0, successHits: 0 }; }
+}
+
+function saveGoldenStats(stats: GoldenStats) {
+    localStorage.setItem(STAT_KEY, JSON.stringify(stats));
+}
 
 function loadTrackedGoldens(): TrackedGolden[] {
     try {
@@ -49,7 +68,7 @@ interface DecisionBuyAiProps {
     vwapStore: Record<string, VwapData>;
     firstSeenTimes: Record<string, number>;
     isLoading: boolean;
-    onTickerClick: (sig: BuySignal) => void;
+    onExternalClick: () => void;
     onAddToWatchlist: (ticker: CexTicker) => void;
 }
 
@@ -66,13 +85,16 @@ interface BuySignal {
 interface SignalCardProps {
     sig: BuySignal;
     currentTime: number;
-    onTickerClick: (sig: BuySignal) => void;
+    onCardClick: (sig: BuySignal) => void;
     onAddToWatchlist: (ticker: CexTicker) => void;
 }
 
-const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClick, onAddToWatchlist }) => (
+const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onCardClick, onAddToWatchlist }) => (
     <div
-        onClick={() => onTickerClick(sig)}
+        onClick={() => {
+            console.log("SignalCard Clicked:", sig.ticker.symbol);
+            onCardClick(sig);
+        }}
         className="group glass-card rounded-[2rem] p-7 flex flex-col text-left relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all"
     >
         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-3xl rounded-full group-hover:bg-purple-600/15 transition-all duration-700"></div>
@@ -87,12 +109,12 @@ const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClic
                 <div>
                     <h3 className="text-xl font-black text-white group-hover:text-purple-400 transition-colors uppercase tracking-tight flex items-center gap-2">
                         {sig.ticker.symbol}
-                        <span className="text-[10px] text-white/20 font-bold tracking-widest italic group-hover:text-purple-400/40">USDT</span>
+                        <span className="text-[10px] text-white/20 font-bold tracking-widest italic group-hover:text-purple-400/40">15m Confirm</span>
                     </h3>
                     <div className="mt-1 flex items-center gap-2">
                         <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${sig.type === 'GOLDEN' ? 'bg-amber-500' : 'bg-purple-500'}`}></div>
                         <span className={`text-[9px] font-black uppercase tracking-[0.1em] ${sig.type === 'GOLDEN' ? 'text-amber-500' : 'text-purple-400'}`}>
-                            {sig.type} SIGNAL ACTIVE
+                            {sig.type} SIGNAL (Confirmed Close)
                         </span>
                     </div>
                 </div>
@@ -162,7 +184,15 @@ const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClic
 ));
 
 // ─── Memoized Performance Row ───────────────
-const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ t, currentTime }) => {
+interface PerformanceRowProps {
+    t: TrackedGolden;
+    currentTime: number;
+    tickers: CexTicker[];
+    vwapStore: Record<string, VwapData>;
+    onRowClick: (ticker: CexTicker, vwap: VwapData) => void;
+}
+
+const PerformanceRow = React.memo<PerformanceRowProps>(({ t, currentTime, tickers, vwapStore, onRowClick }) => {
     const isClosed = !!t.exitTime;
     const pnl = isClosed ? (t.realizedPnl || 0) : (((t.lastPrice - t.entryPrice) / t.entryPrice) * 100);
     const elapsed = (isClosed ? t.exitTime! : currentTime) - t.signalTime;
@@ -183,10 +213,11 @@ const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ 
     return (
         <div
             onClick={() => {
+                console.log("PerformanceRow Clicked:", t.symbol);
                 const ticker = tickers.find(tic => tic.symbol === t.symbol);
                 const vwap = vwapStore[ticker?.id || ""];
                 if (vwap && ticker) {
-                    setSelectedChart({ ticker, vwap });
+                    onRowClick(ticker, vwap);
                 }
             }}
 
@@ -201,6 +232,7 @@ const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ 
                     <div className="flex items-center gap-3">
                         <span className="text-sm font-black text-white uppercase tracking-tight italic">{t.symbol}</span>
                         {t.stillActive && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>}
+                        {t.tpHit && <Target className="w-3.5 h-3.5 text-amber-500 ml-1" />}
                         {isClosed && <span className="text-[7px] bg-white/5 px-1.5 py-0.5 rounded border border-white/10 text-white/40 font-black tracking-widest uppercase">REALIZED</span>}
                     </div>
                     <span className="text-[8px] text-white/20 font-black uppercase tracking-widest">
@@ -259,7 +291,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
     vwapStore,
     firstSeenTimes,
     isLoading,
-    onTickerClick,
+    onExternalClick,
     onAddToWatchlist
 }) => {
     const [showSettings, setShowSettings] = useState(false);
@@ -328,19 +360,16 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             const vwap = vwapStore[t.id];
             if (!vwap) return null;
 
-            const price = t.priceUsd;
-            let signal: BuySignal | null = null;
-            const isMonday = new Date().getUTCDay() === 1;
-
-            // Trend strength (0.05 threshold same as chart coloring)
             const isVwapPositive = vwap.normalizedSlope > 0.05;
-            const isVwapNegative = vwap.normalizedSlope < -0.05;
+            const lastClose = vwap.last15mClose || 0;
+            const isConfirmedNow = lastClose > vwap.max && lastClose > vwap.mid;
 
-            // ─── GOLDEN SIGNAL LOGIC ───
-            // Requirement: Price > Max && Daily VWAP Slope is Positive
-            const isPriceAboveMax = price > vwap.max;
+            const prevClose = vwap.prev15mClose || 0;
+            const wasConfirmedPrev = prevClose > vwap.max && prevClose > vwap.mid;
 
-            if (isPriceAboveMax && isVwapPositive) {
+            const isFreshCrossover = isConfirmedNow && !wasConfirmedPrev;
+
+            if (isFreshCrossover && isVwapPositive) {
                 const rvol = vwap.volumeRelative || 1.0;
                 const isNeuralAlpha = vwap.normalizedSlope > 0.10 && rvol > 1.2;
 
@@ -348,80 +377,66 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 if (rvol > 1.5) score += 2;
                 if (isNeuralAlpha) score += 2;
 
-                signal = {
+                return {
                     ticker: t,
                     vwap,
                     score: Math.min(100, score),
                     reason: isNeuralAlpha
-                        ? `Neural Alpha: Elite breakout detected with high volume (${rvol.toFixed(1)}x) and extreme positive slope.`
-                        : isMonday
-                            ? "Monday Golden: Price above Weekly Max with strong positive trend. High probability start."
-                            : "Golden Breakout: Price holding above Weekly Max with confirmed positive momentum.",
-                    activeSince: firstSeenTimes[t.id] || Date.now(),
-                    type: 'GOLDEN'
-                };
-            }
-            // ──── EXIT SIGNAL ────
-            else if (isVwapNegative) {
-                signal = {
-                    ticker: t,
-                    vwap,
-                    score: 90, // "Exit priority"
-                    reason: "VWAP Trend reversal. Daily slope turned negative. High risk of redistribution.",
-                    type: 'EXIT'
-                };
-            }
-            // 2. MOMENTUM PUSH: Price > Mid && Price < Max && Trend positive
-            else if (price > vwap.mid && price < vwap.max && isVwapPositive) {
-                signal = {
-                    ticker: t,
-                    vwap,
-                    score: 85 + Math.min(10, vwap.normalizedSlope * 10),
-                    reason: "Momentum buildup. Trend is positive and approaching Weekly Max resistance.",
-                    type: 'MOMENTUM'
-                };
-            }
-            // 3. SUPPORT BOUNCE: Price approx Mid && Pos trend
-            else if (Math.abs(price - vwap.mid) / vwap.mid < 0.02 && isVwapPositive) {
-                signal = {
-                    ticker: t,
-                    vwap,
-                    score: 80,
-                    reason: "Bouncing off Weekly Mid support with positive daily trend confirmation.",
-                    type: 'SUPPORT'
+                        ? `Neural Alpha: Elite fresh 15m confirmed breakout.`
+                        : `Fresh 15m Crossover: Confirmed closed at $${formatPrice(lastClose)}.`,
+                    activeSince: (firstSeenTimes[t.id] || Date.now()),
+                    type: 'GOLDEN' as const
                 };
             }
 
-            return signal;
-        })
-            .filter((s): s is BuySignal => s !== null)
-            .sort((a, b) => {
-                // EXITs always first
-                if (a.type === 'EXIT' && b.type !== 'EXIT') return -1;
-                if (b.type === 'EXIT' && a.type !== 'EXIT') return 1;
-
-                if (sortBy === 'time') {
-                    const aTime = a.activeSince || 0;
-                    const bTime = b.activeSince || 0;
-                    return bTime - aTime; // Newest first
-                }
-                return b.score - a.score;
-            });
-    }, [tickers, vwapStore, firstSeenTimes, sortBy]);
+            return null;
+        }).filter((s): s is BuySignal => s !== null);
+    }, [tickers, vwapStore, firstSeenTimes]);
 
     // Filtered signals for UI display (Show only GOLDEN Entry signals)
     const displaySignals = useMemo(() => {
-        return signals.filter((s: BuySignal) => s.type === 'GOLDEN');
-    }, [signals]);
+        // 1. Current fresh signals
+        const freshGoldens: BuySignal[] = signals
+            .filter((s): s is BuySignal => s !== null && s.type === 'GOLDEN')
+            .map(sig => {
+                const track = trackedGoldens.find(t => t.symbol === sig.ticker.symbol);
+                return {
+                    ...sig,
+                    activeSince: track ? track.signalTime : sig.activeSince
+                };
+            });
+
+        // 2. Sticky Goldens: Tracked tokens that are still active but maybe not in fresh signals
+        const stickyGoldens: BuySignal[] = trackedGoldens
+            .filter(t => t.stillActive && !freshGoldens.some(g => g.ticker.symbol === t.symbol))
+            .map(t => {
+                const ticker = tickers.find(tk => tk.symbol === t.symbol);
+                const vwap = vwapStore[ticker?.id || ''];
+                if (!ticker || !vwap) return null;
+
+                const pnl = ((ticker.priceUsd - t.entryPrice) / t.entryPrice) * 100;
+
+                return {
+                    ticker,
+                    vwap,
+                    score: 90,
+                    reason: `Holding Signal: Initial Golden breakout confirmed.`,
+                    activeSince: t.signalTime,
+                    type: 'GOLDEN' as const
+                };
+            }).filter((s): s is BuySignal => s !== null);
+
+        return [...freshGoldens, ...stickyGoldens].sort((a, b) => (b.score || 0) - (a.score || 0));
+    }, [signals, trackedGoldens, tickers, vwapStore]);
 
     // ─── Telegram Alert Trigger ───────────────────
     useEffect(() => {
         if (!tgConfig.enabled) return;
 
-        const allActiveSymbols = new Set(signals.map((s: BuySignal) => s.ticker.symbol));
+        const allActiveSymbols = new Set(signals.map(s => s.ticker.symbol));
 
         let sent = 0;
-        signals.forEach((sig: BuySignal) => {
+        signals.forEach(sig => {
             const symbol = sig.ticker.symbol;
 
             if (sig.type === 'GOLDEN') {
@@ -438,44 +453,16 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     });
                     playAlarm();
                     alertedRef.current.add(symbol);
-                    exitAlertedRef.current.delete(symbol); // Reset exit alert if it becomes golden again
                     sent++;
-                }
-            } else if (sig.type === 'EXIT') {
-                if (!exitAlertedRef.current.has(symbol)) {
-                    sendGoldenSignalAlert({
-                        symbol,
-                        price: sig.ticker.priceUsd,
-                        change24h: sig.ticker.priceChangePercent24h,
-                        score: sig.score,
-                        vwapMax: sig.vwap.max,
-                        vwapMid: sig.vwap.mid,
-                        reason: sig.reason,
-                        type: 'EXIT'
-                    });
-                    // Only play alarm for EXIT if it was previously a known positive signal
-                    if (alertedRef.current.has(symbol)) playAlarm();
-
-                    exitAlertedRef.current.add(symbol);
-                    alertedRef.current.delete(symbol);
-                    sent++;
-                }
-            } else {
-                // Not golden or exit: if it was alerted before, clear it so it can re-trigger
-                if (alertedRef.current.has(symbol)) {
-                    alertedRef.current.delete(symbol);
                 }
             }
         });
 
         // Cleanup: tokens that completely fell out of signals
-        const cleanupList = [alertedRef, exitAlertedRef];
-        cleanupList.forEach((ref: React.MutableRefObject<Set<string>>) => {
-            ref.current.forEach((symbol: string) => {
-                if (!allActiveSymbols.has(symbol)) {
-                    ref.current.delete(symbol);
-                }
-            });
+        alertedRef.current.forEach(symbol => {
+            if (!allActiveSymbols.has(symbol)) {
+                alertedRef.current.delete(symbol);
+            }
         });
 
         if (sent > 0) setAlertCount(prev => prev + sent);
@@ -490,6 +477,9 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             let updated = [...prev];
 
             // 1. Add new golden signals not yet tracked
+            const stats = loadGoldenStats();
+            let statsChanged = false;
+
             goldenSignals.forEach((sig: BuySignal) => {
                 const existing = updated.find((t: TrackedGolden) => t.symbol === sig.ticker.symbol);
                 if (!existing) {
@@ -502,8 +492,12 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                         lastPrice: sig.ticker.priceUsd,
                         stillActive: true,
                         wasActive: true,
-                        history: [sig.ticker.priceUsd]
+                        history: [sig.ticker.priceUsd],
+                        wasCounted: true,
+                        tpHit: false
                     });
+                    stats.totalSignals++;
+                    statsChanged = true;
                 } else if (!existing.stillActive && !existing.exitTime) {
                     // Re-activate if it was just waiting/fresh and didn't close yet
                     existing.stillActive = true;
@@ -522,22 +516,22 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 const isCurrentlyGolden = goldenSymbols.has(t.symbol);
                 const currentPrice = ticker.priceUsd;
 
-                // Detect EXIT: was active golden, but now is not
-                if (t.stillActive && !isCurrentlyGolden) {
-                    const finalPnl = ((currentPrice - t.entryPrice) / t.entryPrice) * 100;
+                const pnl = ((currentPrice - t.entryPrice) / t.entryPrice) * 100;
+
+                // Detect TP EXIT: if it was active, but reached 4% profit
+                if (t.stillActive && pnl >= 4) {
                     return {
                         ...t,
                         lastPrice: currentPrice,
                         stillActive: false,
                         exitPrice: currentPrice,
                         exitTime: Date.now(),
-                        realizedPnl: finalPnl,
+                        realizedPnl: pnl,
                         maxPrice: Math.max(t.maxPrice, currentPrice),
-                        maxGainPct: Math.max(t.maxGainPct, finalPnl)
+                        maxGainPct: Math.max(t.maxGainPct, pnl)
                     };
                 }
 
-                const pnl = ((currentPrice - t.entryPrice) / t.entryPrice) * 100;
                 const newMax = Math.max(t.maxPrice, currentPrice);
                 const newMaxGain = Math.max(t.maxGainPct, pnl);
 
@@ -545,15 +539,40 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 const history = t.history || [t.entryPrice];
                 const shouldAddPoint = history.length < 144 && (Date.now() - (t.signalTime + (history.length - 1) * 10 * 60 * 1000) > 10 * 60 * 1000);
 
+                const isHittingTp = pnl >= 4 && t.stillActive;
+
+                if (isHittingTp && !t.tpHit) {
+                    stats.successHits++;
+                    statsChanged = true;
+                }
+
+                if (isHittingTp) {
+                    return {
+                        ...t,
+                        lastPrice: currentPrice,
+                        stillActive: false,
+                        exitPrice: currentPrice,
+                        exitTime: Date.now(),
+                        realizedPnl: pnl,
+                        maxPrice: newMax,
+                        maxGainPct: newMaxGain,
+                        history: shouldAddPoint ? [...history, currentPrice] : history,
+                        tpHit: true
+                    };
+                }
+
                 return {
                     ...t,
                     lastPrice: currentPrice,
                     maxPrice: newMax,
                     maxGainPct: newMaxGain,
-                    stillActive: isCurrentlyGolden,
-                    history: shouldAddPoint ? [...history, currentPrice] : history
+                    stillActive: t.stillActive || isCurrentlyGolden,
+                    history: shouldAddPoint ? [...history, currentPrice] : history,
+                    tpHit: t.tpHit
                 };
             });
+
+            if (statsChanged) saveGoldenStats(stats);
 
             // 3. Filter expired (>24h)
             const now = Date.now();
@@ -563,6 +582,13 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             return updated;
         });
     }, [signals, tickers]);
+
+    const handleResetTracker = () => {
+        if (!window.confirm("Clear all active signals and reset site win rate?")) return;
+        setTrackedGoldens([]);
+        localStorage.removeItem('dexpulse_tracked_goldens');
+        localStorage.removeItem('dexpulse_golden_stats');
+    };
 
     const handleSaveConfig = (config: TelegramConfig) => {
         saveTelegramConfig(config);
@@ -620,6 +646,13 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
 
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3 pr-4 border-r border-white/10">
+                        <button
+                            onClick={handleResetTracker}
+                            title="Reset Tracker & Stats"
+                            className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center hover:bg-red-500/20 hover:border-red-500/40 transition-all group/reset"
+                        >
+                            <RefreshCcw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+                        </button>
                         <div className="text-right">
                             <span className="block text-[8px] font-black text-white/20 uppercase tracking-widest leading-none">Alerts</span>
                             <span className="text-sm font-black text-purple-400 italic">#{_alertCount} Today</span>
@@ -704,7 +737,10 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                             key={sig.ticker.id}
                             sig={sig}
                             currentTime={currentTime}
-                            onTickerClick={(s) => setSelectedChart({ ticker: s.ticker, vwap: s.vwap })}
+                            onCardClick={(s) => {
+                                console.log("Selecting chart for:", s.ticker.symbol);
+                                setSelectedChart({ ticker: s.ticker, vwap: s.vwap });
+                            }}
                             onAddToWatchlist={onAddToWatchlist}
                         />
                     ))}
@@ -744,12 +780,23 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                             </div>
 
                             <div className="flex items-center gap-4 bg-black/40 p-2 rounded-3xl border border-white/[0.03]">
+                                {(() => {
+                                    const globalStats = loadGoldenStats();
+                                    const globalWinRate = globalStats.totalSignals > 0 ? (globalStats.successHits / globalStats.totalSignals) * 100 : 0;
+                                    return (
+                                        <div className="px-8 py-3 bg-amber-500/10 rounded-2xl border border-amber-500/20 group hover:border-amber-500/40 transition-all">
+                                            <div className="text-[8px] font-black text-amber-500/60 uppercase tracking-widest mb-1">Global Success (+4% TP)</div>
+                                            <span className="text-xl font-black text-white italic tracking-tighter">{globalWinRate.toFixed(1)}%</span>
+                                            <span className="text-[9px] text-white/20 ml-2">({globalStats.successHits}/{globalStats.totalSignals})</span>
+                                        </div>
+                                    );
+                                })()}
                                 <div className="px-8 py-3 bg-white/5 rounded-2xl border border-white/5 group hover:border-emerald-500/30 transition-all">
                                     <div className="text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">Portfolio yield</div>
                                     <span className={`text-xl font-black italic tracking-tighter ${avgPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{avgPnl >= 0 ? '+' : ''}{avgPnl.toFixed(2)}%</span>
                                 </div>
                                 <div className="px-8 py-3 bg-white/5 rounded-2xl border border-white/5 group hover:border-amber-500/30 transition-all">
-                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">Signal Fidelity</div>
+                                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">24h Signal Fidelity</div>
                                     <span className={`text-xl font-black italic tracking-tighter ${winRate >= 50 ? 'text-amber-500' : 'text-rose-400'}`}>{winRate.toFixed(0)}%</span>
                                 </div>
                             </div>
@@ -766,7 +813,16 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                                     <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full">{winners.length} Pairs</span>
                                 </div>
                                 <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
-                                    {winners.length > 0 ? winners.filter(t => !t.exitTime).map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
+                                    {winners.length > 0 ? winners.filter(t => !t.exitTime).map(t => (
+                                        <PerformanceRow
+                                            key={t.symbol}
+                                            t={t}
+                                            currentTime={currentTime}
+                                            tickers={tickers}
+                                            vwapStore={vwapStore}
+                                            onRowClick={(ticker, vwap) => setSelectedChart({ ticker, vwap })}
+                                        />
+                                    )) : (
                                         <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">Awaiting Alpha Confirmations...</div>
                                     )}
                                 </div>
@@ -782,7 +838,16 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                                     <span className="text-[10px] font-black text-rose-500 bg-rose-500/10 px-3 py-1 rounded-full">{losers.length} Pairs</span>
                                 </div>
                                 <div className="space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar px-2">
-                                    {losers.length > 0 ? losers.filter(t => !t.exitTime).map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />) : (
+                                    {losers.length > 0 ? losers.filter(t => !t.exitTime).map(t => (
+                                        <PerformanceRow
+                                            key={t.symbol}
+                                            t={t}
+                                            currentTime={currentTime}
+                                            tickers={tickers}
+                                            vwapStore={vwapStore}
+                                            onRowClick={(ticker, vwap) => setSelectedChart({ ticker, vwap })}
+                                        />
+                                    )) : (
                                         <div className="h-32 rounded-3xl border border-dashed border-white/5 flex items-center justify-center text-[10px] font-black text-white/10 uppercase tracking-widest">No Negative Variance Detected 🎯</div>
                                     )}
                                 </div>
@@ -823,7 +888,16 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                                     trackedGoldens
                                         .filter(t => t.exitTime)
                                         .sort((a, b) => (b.exitTime || 0) - (a.exitTime || 0))
-                                        .map(t => <PerformanceRow key={t.symbol} t={t} currentTime={currentTime} />)
+                                        .map(t => (
+                                            <PerformanceRow
+                                                key={t.symbol}
+                                                t={t}
+                                                currentTime={currentTime}
+                                                tickers={tickers}
+                                                vwapStore={vwapStore}
+                                                onRowClick={(ticker, vwap) => setSelectedChart({ ticker, vwap })}
+                                            />
+                                        ))
                                 ) : (
                                     <div className="col-span-full h-32 flex flex-col items-center justify-center border border-dashed border-white/5 rounded-3xl opacity-20 group">
                                         <p className="text-[10px] font-black uppercase tracking-[0.4em] group-hover:tracking-[0.6em] transition-all">Vault Empty - No Neural Trades Finalized Yet</p>

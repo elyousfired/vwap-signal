@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { CexTicker, VwapData } from './types';
 import { fetchCexTickers, fetchWeeklyVwapData } from './services/cexService';
 import { DecisionBuyAi } from './components/DecisionBuyAi';
@@ -11,11 +11,13 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [vwapLoading, setVwapLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const ref = React.useRef<CexTicker[]>([]);
 
   const loadInitialData = useCallback(async () => {
     try {
       const data = await fetchCexTickers();
       setTickers(data);
+      ref.current = data;
       setLoading(false);
     } catch (error) {
       console.error('Failed to load tickers:', error);
@@ -31,14 +33,20 @@ function App() {
 
   // VWAP Signal Polling Logic (Standalone Engine)
   useEffect(() => {
-    if (tickers.length === 0) return;
-
     let cancelled = false;
-    const mainTickers = tickers
-      .filter(t => t.volume24h > 500000)
-      .slice(0, 150);
 
     const fetchSignals = async () => {
+      const currentTickers = ref.current;
+      if (currentTickers.length === 0) {
+        console.log('[VWAP AI] Tickers empty, retrying in 3s...');
+        setTimeout(fetchSignals, 3000);
+        return;
+      }
+
+      const mainTickers = currentTickers
+        .filter(t => t.volume24h > 500000)
+        .slice(0, 150);
+
       setVwapLoading(true);
 
       const CHUNK_SIZE = 15; // Increased from 5
@@ -81,13 +89,28 @@ function App() {
       }
     };
 
-    fetchSignals();
-    const signalInterval = setInterval(fetchSignals, 120000);
+    const scheduleNextFetch = () => {
+      const now = new Date();
+      const mins = now.getMinutes();
+      const secs = now.getSeconds();
+      const ms = now.getMilliseconds();
+
+      const next15 = 15 - (mins % 15);
+      const delayMs = (next15 * 60 * 1000) - (secs * 1000) - ms + (20 * 1000);
+
+      console.log(`[VWAP AI] Next sync in ${Math.round(delayMs / 1000)}s`);
+      return setTimeout(() => {
+        if (!cancelled) {
+          fetchSignals().then(scheduleNextFetch);
+        }
+      }, delayMs);
+    };
+
+    fetchSignals().then(scheduleNextFetch);
     return () => {
       cancelled = true;
-      clearInterval(signalInterval);
     };
-  }, [tickers.length > 0]);
+  }, []); // Run once on mount
 
   if (loading) {
     return (
@@ -207,9 +230,10 @@ function App() {
                 vwapStore={vwapStore}
                 firstSeenTimes={firstSeenTimes}
                 isLoading={vwapLoading}
-                onTickerClick={() => {
-                  // Handled internally by setChartData in DecisionBuyAi
+                onExternalClick={() => {
+                  console.log("External click triggered from DecisionBuyAi (Empty)");
                 }}
+
                 onAddToWatchlist={() => { }}
               />
             </div>

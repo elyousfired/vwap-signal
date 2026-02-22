@@ -146,4 +146,6 @@ export interface VwapData {
   normalizedSlope: number;
   symbol: string;
   volumeRelative: number; // Current volume / Average volume kline ratio
+  last15mClose?: number;
+  prev15mClose?: number;
 }
