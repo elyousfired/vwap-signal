@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { FC } from 'react';
 import type { CexTicker, VwapData } from '../types';
-import { formatPrice } from '../services/cexService';
-import { Brain, Star, TrendingUp, TrendingDown, ArrowRight, Zap, Trophy, ShieldCheck, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Target, RefreshCcw } from 'lucide-react';
+import { formatPrice, fetchDailyVwapSequence } from '../services/cexService';
+import { Brain, Star, TrendingUp, TrendingDown, ArrowRight, Zap, Trophy, ShieldCheck, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Target, RefreshCcw, X } from 'lucide-react';
+import { TokenChart } from './TokenChart';
 import { sendGoldenSignalAlert, loadTelegramConfig, saveTelegramConfig, sendTestAlert } from '../services/telegramService';
 import type { TelegramConfig } from '../services/telegramService';
 
@@ -48,7 +49,7 @@ interface DecisionBuyAiProps {
     vwapStore: Record<string, VwapData>;
     firstSeenTimes: Record<string, number>;
     isLoading: boolean;
-    onTickerClick: (ticker: CexTicker) => void;
+    onTickerClick: (sig: BuySignal) => void;
     onAddToWatchlist: (ticker: CexTicker) => void;
 }
 
@@ -65,14 +66,14 @@ interface BuySignal {
 interface SignalCardProps {
     sig: BuySignal;
     currentTime: number;
-    onTickerClick: (ticker: CexTicker) => void;
+    onTickerClick: (sig: BuySignal) => void;
     onAddToWatchlist: (ticker: CexTicker) => void;
 }
 
 const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClick, onAddToWatchlist }) => (
-    <button
-        onClick={() => onTickerClick(sig.ticker)}
-        className="group glass-card rounded-[2rem] p-7 flex flex-col text-left relative overflow-hidden"
+    <div
+        onClick={() => onTickerClick(sig)}
+        className="group glass-card rounded-[2rem] p-7 flex flex-col text-left relative overflow-hidden cursor-pointer active:scale-[0.98] transition-all"
     >
         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 blur-3xl rounded-full group-hover:bg-purple-600/15 transition-all duration-700"></div>
         <div className="flex items-start justify-between mb-8 relative z-10">
@@ -101,6 +102,9 @@ const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClic
                     <Trophy className={`w-4 h-4 ${sig.score > 90 ? 'text-amber-500' : 'text-purple-400'}`} />
                     <span className="text-2xl font-black text-white italic tracking-tighter">{sig.score.toFixed(0)}</span>
                 </div>
+                <div className={`mt-2 px-2 py-0.5 rounded-lg border text-[8px] font-black uppercase tracking-widest ${sig.vwap.volumeRelative > 1.5 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-white/5 border-white/10 text-white/40'}`}>
+                    RVOL: {sig.vwap.volumeRelative.toFixed(1)}x
+                </div>
                 {sig.activeSince && (
                     <span className="text-[9px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">
                         ⏱️ {Math.floor((currentTime - sig.activeSince) / 1000 / 60)}m {Math.floor((currentTime - sig.activeSince) / 1000) % 60}s
@@ -108,6 +112,16 @@ const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClic
                 )}
             </div>
         </div>
+
+        {sig.score >= 98 && (
+            <div className="mx-7 mb-4 px-4 py-2 bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-xl flex items-center justify-between animate-pulse">
+                <div className="flex items-center gap-2">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest">Neural Alpha Active</span>
+                </div>
+                <div className="text-[8px] font-bold text-amber-500/60 uppercase">High Conviction</div>
+            </div>
+        )}
         <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/[0.04] mb-8 group-hover:bg-white/[0.05] transition-all relative z-10">
             <div className="flex items-center gap-2.5 mb-2.5">
                 <ShieldCheck className="w-4 h-4 text-purple-400" />
@@ -144,7 +158,7 @@ const SignalCard = React.memo<SignalCardProps>(({ sig, currentTime, onTickerClic
                 <ArrowRight className="w-4 h-4 text-purple-400 translate-x-0 group-hover:translate-x-1 transition-transform" />
             </div>
         </div>
-    </button>
+    </div>
 ));
 
 // ─── Memoized Performance Row ───────────────
@@ -167,7 +181,17 @@ const PerformanceRow = React.memo<{ t: TrackedGolden, currentTime: number }>(({ 
     }).join(' ');
 
     return (
-        <div className={`flex items-center gap-5 p-4 rounded-2xl border transition-all group/row ${isClosed ? 'bg-black/40 border-white/[0.02] opacity-80 hover:opacity-100' : 'bg-white/[0.02] border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.04]'}`}>
+        <div
+            onClick={() => {
+                const ticker = tickers.find(tic => tic.symbol === t.symbol);
+                const vwap = vwapStore[ticker?.id || ""];
+                if (vwap && ticker) {
+                    setSelectedChart({ ticker, vwap });
+                }
+            }}
+
+            className={`flex items-center gap-5 p-4 rounded-2xl border transition-all group/row cursor-pointer ${isClosed ? 'bg-black/40 border-white/[0.02] opacity-80 hover:opacity-100' : 'bg-white/[0.02] border-white/[0.04] hover:border-white/[0.08] hover:bg-white/[0.04]'}`}
+        >
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg ${t.stillActive ? 'bg-white text-black' : isClosed ? 'bg-purple-900/40 text-purple-300' : 'bg-white/10 text-white/30'}`}>
                 {t.symbol[0]}
             </div>
@@ -252,6 +276,31 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [trackedGoldens, setTrackedGoldens] = useState<TrackedGolden[]>(loadTrackedGoldens);
+    const [selectedChart, setSelectedChart] = useState<{ ticker: CexTicker, vwap: VwapData } | null>(null);
+    const [chartData, setChartData] = useState<{ time: number, vwap: number }[]>([]);
+    const [isChartLoading, setIsChartLoading] = useState(false);
+
+    // Fetch chart data when a ticker is selected
+    useEffect(() => {
+        if (!selectedChart) {
+            setChartData([]);
+            return;
+        }
+
+        const loadChart = async () => {
+            setIsChartLoading(true);
+            try {
+                const data = await fetchDailyVwapSequence(selectedChart.ticker.symbol);
+                setChartData(data);
+            } catch (e) {
+                console.error("Failed to load chart data:", e);
+            } finally {
+                setIsChartLoading(false);
+            }
+        };
+
+        loadChart();
+    }, [selectedChart]);
 
     const playAlarm = () => {
         if (!audioEnabled || !audioRef.current) return;
@@ -292,13 +341,22 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             const isPriceAboveMax = price > vwap.max;
 
             if (isPriceAboveMax && isVwapPositive) {
+                const rvol = vwap.volumeRelative || 1.0;
+                const isNeuralAlpha = vwap.normalizedSlope > 0.10 && rvol > 1.2;
+
+                let score = 95 + Math.min(3, vwap.normalizedSlope * 10);
+                if (rvol > 1.5) score += 2;
+                if (isNeuralAlpha) score += 2;
+
                 signal = {
                     ticker: t,
                     vwap,
-                    score: 95 + Math.min(5, vwap.normalizedSlope * 20),
-                    reason: isMonday
-                        ? "Monday Golden: Price above Weekly Max with strong positive trend. High probability start."
-                        : "Golden Breakout: Price holding above Weekly Max with confirmed positive momentum.",
+                    score: Math.min(100, score),
+                    reason: isNeuralAlpha
+                        ? `Neural Alpha: Elite breakout detected with high volume (${rvol.toFixed(1)}x) and extreme positive slope.`
+                        : isMonday
+                            ? "Monday Golden: Price above Weekly Max with strong positive trend. High probability start."
+                            : "Golden Breakout: Price holding above Weekly Max with confirmed positive momentum.",
                     activeSince: firstSeenTimes[t.id] || Date.now(),
                     type: 'GOLDEN'
                 };
@@ -646,7 +704,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                             key={sig.ticker.id}
                             sig={sig}
                             currentTime={currentTime}
-                            onTickerClick={onTickerClick}
+                            onTickerClick={(s) => setSelectedChart({ ticker: s.ticker, vwap: s.vwap })}
                             onAddToWatchlist={onAddToWatchlist}
                         />
                     ))}
@@ -788,6 +846,88 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     This terminal is designed for advanced traders. VWAP indicators and Neural signals are calculated based on historical structural data. Market risk is high. Continuous synchronization with global liquidity is not guaranteed.
                 </p>
             </footer>
+
+            {/* Chart Modal Overlay - Moved to end of viewport hierarchy */}
+            {selectedChart && (
+                <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 lg:p-12">
+                    <div
+                        className="absolute inset-0 bg-black/90 backdrop-blur-2xl transition-opacity animate-in fade-in"
+                        onClick={() => setSelectedChart(null)}
+                    ></div>
+                    <div className="relative w-full max-w-5xl glass-panel rounded-[3rem] border border-purple-500/20 overflow-hidden shadow-[0_0_100px_rgba(168,85,247,0.15)] animate-in zoom-in-95 duration-300">
+                        <div className="absolute top-0 right-0 p-8 z-10">
+                            <button
+                                onClick={() => setSelectedChart(null)}
+                                className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-white transition-all group"
+                            >
+                                <X className="w-6 h-6 group-hover:rotate-90 transition-transform" />
+                            </button>
+                        </div>
+
+                        <div className="p-12">
+                            <div className="mb-12">
+                                <div className="flex items-center gap-4 mb-4">
+                                    <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse"></div>
+                                    <span className="text-[10px] font-black text-purple-500 uppercase tracking-[0.4em]">Neural Market Visualization</span>
+                                </div>
+                                <h2 className="text-4xl font-black text-white italic tracking-tighter uppercase">
+                                    {selectedChart.ticker.symbol} <span className="text-purple-500">Analytics</span>
+                                </h2>
+                            </div>
+
+                            {isChartLoading ? (
+                                <div className="h-[400px] flex flex-col items-center justify-center">
+                                    <div className="w-20 h-20 border-4 border-purple-500/10 border-t-purple-500 rounded-full animate-spin mb-6"></div>
+                                    <p className="text-sm font-black text-white/20 uppercase tracking-[0.3em]">Quantum Data Retrieval...</p>
+                                </div>
+                            ) : (
+                                <TokenChart
+                                    symbol={selectedChart.ticker.symbol}
+                                    dailyVwap={chartData}
+                                    wMax={selectedChart.vwap.max}
+                                    wMin={selectedChart.vwap.min}
+                                    currentPrice={selectedChart.ticker.priceUsd}
+                                    className="border-none bg-transparent"
+                                />
+                            )}
+
+                            <div className="mt-12 grid grid-cols-3 gap-8">
+                                <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.05]">
+                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-widest block mb-2">24h Change</span>
+                                    <span className={`text-2xl font-black italic tracking-tighter ${selectedChart.ticker.priceChangePercent24h >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {selectedChart.ticker.priceChangePercent24h >= 0 ? '+' : ''}{selectedChart.ticker.priceChangePercent24h.toFixed(2)}%
+                                    </span>
+                                </div>
+                                <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.05]">
+                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-widest block mb-2">Rel Volume</span>
+                                    <span className="text-2xl font-black text-white italic tracking-tighter">
+                                        {selectedChart.vwap.volumeRelative.toFixed(1)}x
+                                    </span>
+                                </div>
+                                <div className="bg-white/[0.03] rounded-3xl p-6 border border-white/[0.05]">
+                                    <span className="text-[10px] font-black text-white/20 uppercase tracking-widest block mb-2">V-Trend</span>
+                                    <span className={`text-2xl font-black italic tracking-tighter ${selectedChart.vwap.normalizedSlope > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                        {selectedChart.vwap.normalizedSlope > 0 ? 'BULLISH' : 'BEARISH'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-purple-500/5 p-8 border-t border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <ShieldCheck className="w-5 h-5 text-purple-400" />
+                                <span className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Live Data Feed • Binance Secure API</span>
+                            </div>
+                            <button
+                                onClick={() => window.open(`https://www.binance.com/en/trade/${selectedChart.ticker.symbol}_USDT`, '_blank')}
+                                className="px-8 py-3 bg-white text-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+                            >
+                                Open Binance Exchange <ArrowRight className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };

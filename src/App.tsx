@@ -207,7 +207,9 @@ function App() {
                 vwapStore={vwapStore}
                 firstSeenTimes={firstSeenTimes}
                 isLoading={vwapLoading}
-                onTickerClick={(t) => window.open(`https://www.binance.com/en/trade/${t.symbol}_USDT`, '_blank')}
+                onTickerClick={() => {
+                  // Handled internally by setChartData in DecisionBuyAi
+                }}
                 onAddToWatchlist={() => { }}
               />
             </div>

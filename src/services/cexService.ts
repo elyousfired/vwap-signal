@@ -428,13 +428,24 @@ export async function fetchWeeklyVwapData(symbol: string): Promise<VwapData | nu
     if (wMax === -Infinity) wMax = currentMid;
     if (wMin === Infinity) wMin = currentMid;
 
+    // RVOL Calculation (Current Volume / 14-day Avg Volume)
+    const VOL_LOOKBACK = 14;
+    let volumeRelative = 1.0;
+    if (klines.length >= VOL_LOOKBACK + 1) {
+        const lastVolumes = klines.slice(-(VOL_LOOKBACK + 1), -1).map(k => k.quoteVolume);
+        const avgVolume = lastVolumes.reduce((s, v) => s + v, 0) / VOL_LOOKBACK;
+        const currentVolume = klines[klines.length - 1].quoteVolume;
+        volumeRelative = avgVolume > 0 ? currentVolume / avgVolume : 1.0;
+    }
+
     const vwapData: VwapData = {
         max: wMax,
         min: wMin,
         mid: currentMid,
         slope,
         normalizedSlope,
-        symbol
+        symbol,
+        volumeRelative
     };
 
     vwapCache.set(symbol, { data: vwapData, expires: Date.now() + VWAP_CACHE_TTL });
@@ -515,3 +526,34 @@ export async function calculateHistoricalCorrelation(symbol: string, btcKlines?:
         outperformScore: (outperformCount / totalDays) * 100
     };
 }
+
+/**
+ * Fetch a sequence of cumulative VWAP points for the current UTC day.
+ * Returns an array of points { time, vwap } based on 15m klines.
+ */
+export async function fetchDailyVwapSequence(symbol: string): Promise<{ time: number, vwap: number }[]> {
+    const klines = await fetchBinanceKlines(symbol, '15m', 100);
+    if (klines.length === 0) return [];
+
+    const todayStart = getTodayStartUTC() / 1000;
+    let dailyKlines = klines.filter(k => k.time >= todayStart);
+
+    // Fallback: If less than 4 points today, show last 24 points (6 hours)
+    if (dailyKlines.length < 4) {
+        dailyKlines = klines.slice(-24);
+    }
+
+    let cumulativeValue = 0;
+    let cumulativeVolume = 0;
+
+    return dailyKlines.map(k => {
+        cumulativeValue += (k.quoteVolume);
+        cumulativeVolume += (k.volume);
+        return {
+            time: k.time,
+            vwap: cumulativeVolume > 0 ? cumulativeValue / cumulativeVolume : k.close
+        };
+    });
+}
+
+
