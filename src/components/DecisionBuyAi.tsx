@@ -304,7 +304,6 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
     });
     const [sortBy, setSortBy] = useState<'score' | 'time'>('score');
     const alertedRef = useRef<Set<string>>(new Set());
-    const exitAlertedRef = useRef<Set<string>>(new Set());
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [currentTime, setCurrentTime] = useState(Date.now());
     const [trackedGoldens, setTrackedGoldens] = useState<TrackedGolden[]>(loadTrackedGoldens);
@@ -407,7 +406,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             });
 
         // 2. Sticky Goldens: Tracked tokens that are still active but maybe not in fresh signals
-        const stickyGoldens: BuySignal[] = trackedGoldens
+        const stickyGoldens: (BuySignal & { activeSince: number })[] = trackedGoldens
             .filter(t => t.stillActive && !freshGoldens.some(g => g.ticker.symbol === t.symbol))
             .map(t => {
                 const ticker = tickers.find(tk => tk.symbol === t.symbol);
@@ -424,9 +423,9 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     activeSince: t.signalTime,
                     type: 'GOLDEN' as const
                 };
-            }).filter((s): s is BuySignal => s !== null);
+            }).filter((s): s is (BuySignal & { activeSince: number }) => s !== null);
 
-        return [...freshGoldens, ...stickyGoldens].sort((a, b) => (b.score || 0) - (a.score || 0));
+        return [...freshGoldens, ...stickyGoldens].sort((a, b) => b.score - (a.score || 0));
     }, [signals, trackedGoldens, tickers, vwapStore]);
 
     // ─── Telegram Alert Trigger ───────────────────
