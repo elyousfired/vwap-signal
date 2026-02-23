@@ -394,8 +394,8 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
     // Filtered signals for UI display (Show only GOLDEN Entry signals)
     const displaySignals = useMemo(() => {
         // 1. Current fresh signals
-        const freshGoldens: BuySignal[] = signals
-            .filter((s): s is BuySignal => s !== null && s.type === 'GOLDEN')
+        const freshGoldens: (BuySignal & { activeSince: number })[] = signals
+            .filter((s): s is (BuySignal & { activeSince: number }) => s !== null && typeof s.activeSince === 'number')
             .map(sig => {
                 const track = trackedGoldens.find(t => t.symbol === sig.ticker.symbol);
                 return {
@@ -540,7 +540,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 const isHittingTp = pnl >= 4 && t.stillActive;
 
                 if (isHittingTp && !t.tpHit) {
-                    stats.successHits++;
+                    stats.successCount++;
                     statsChanged = true;
                 }
 
