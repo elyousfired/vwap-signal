@@ -388,8 +388,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 };
             }
 
-            return null;
-        }).filter((s): s is BuySignal => s !== null);
+        }).filter((s): s is (BuySignal & { activeSince: number }) => s !== null && typeof s.activeSince === 'number');
     }, [tickers, vwapStore, firstSeenTimes]);
 
     // Filtered signals for UI display (Show only GOLDEN Entry signals)
