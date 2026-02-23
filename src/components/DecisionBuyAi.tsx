@@ -1,35 +1,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { FC } from 'react';
-import type { CexTicker, VwapData } from '../types';
+import type { CexTicker, VwapData, BuySignal, BuyType, TrackedGolden, GoldenStats } from '../types';
 import { formatPrice, fetchDailyVwapSequence } from '../services/cexService';
 import { Brain, Star, TrendingUp, TrendingDown, ArrowRight, Zap, Trophy, ShieldCheck, Settings, Send, CheckCircle, XCircle, Volume2, VolumeX, Timer, Target, RefreshCcw, X } from 'lucide-react';
 import { TokenChart } from './TokenChart';
 import { sendGoldenSignalAlert, loadTelegramConfig, saveTelegramConfig, sendTestAlert } from '../services/telegramService';
 import type { TelegramConfig } from '../services/telegramService';
 
-// ─── Golden Signal Tracker Types ───────────────
-interface TrackedGolden {
-    symbol: string;
-    entryPrice: number;
-    signalTime: number;
-    maxPrice: number;
-    maxGainPct: number;
-    lastPrice: number;
-    stillActive: boolean;
-    history?: number[];
-    exitPrice?: number;
-    exitTime?: number;
-    realizedPnl?: number;
-    wasActive?: boolean; // Added to distinguish between 'not yet golden' and 'exhausted golden'
-    wasCounted?: boolean;
-    tpHit?: boolean;
-}
-
-interface GoldenStats {
-    totalSignals: number;
-    successHits: number;
-}
 
 const STAT_KEY = 'dexpulse_golden_stats';
 const GOLDEN_TRACKER_KEY = 'dexpulse_golden_tracker';
@@ -38,8 +16,8 @@ const TRACKER_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 function loadGoldenStats(): GoldenStats {
     try {
         const raw = localStorage.getItem(STAT_KEY);
-        return raw ? JSON.parse(raw) : { totalSignals: 0, successHits: 0 };
-    } catch { return { totalSignals: 0, successHits: 0 }; }
+        return raw ? JSON.parse(raw) : { totalSignals: 0, successCount: 0, successRate: 0, avgGain: 0 };
+    } catch { return { totalSignals: 0, successCount: 0, successRate: 0, avgGain: 0 }; }
 }
 
 function saveGoldenStats(stats: GoldenStats) {
@@ -72,14 +50,6 @@ interface DecisionBuyAiProps {
     onAddToWatchlist: (ticker: CexTicker) => void;
 }
 
-interface BuySignal {
-    ticker: CexTicker;
-    vwap: VwapData;
-    score: number;
-    reason: string;
-    type: 'GOLDEN' | 'MOMENTUM' | 'SUPPORT' | 'EXIT';
-    activeSince?: number; // timestamp
-}
 
 // ─── Memoized Signal Card ─────────────────
 interface SignalCardProps {
@@ -599,6 +569,13 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
         setTestStatus(ok ? 'ok' : 'fail');
         setTimeout(() => setTestStatus('idle'), 3000);
     };
+
+    const winners = trackedGoldens.filter(t => t.maxGainPct >= 4);
+    const losers = trackedGoldens.filter(t => !t.stillActive && t.maxGainPct < 4 && t.exitTime);
+
+    // Calculate site-wide metrics from global stats
+    const stats = loadGoldenStats();
+    const siteWinRate = stats.totalSignals > 0 ? (stats.successCount / stats.totalSignals) * 100 : 0;
 
     if (isLoading && Object.keys(vwapStore).length === 0) {
         return (
