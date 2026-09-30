@@ -230,10 +230,6 @@ function App() {
                 vwapStore={vwapStore}
                 firstSeenTimes={firstSeenTimes}
                 isLoading={vwapLoading}
-                onExternalClick={() => {
-                  console.log("External click triggered from DecisionBuyAi (Empty)");
-                }}
-
                 onAddToWatchlist={() => { }}
               />
             </div>

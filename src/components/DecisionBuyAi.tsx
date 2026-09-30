@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import type { FC } from 'react';
-import type { CexTicker, VwapData, BuySignal } from '../types';
+import type { CexTicker, VwapData } from '../types';
 import { formatPrice, fetchDailyVwapSequence } from '../services/cexService';
 import { Brain, Star, ArrowRight, Zap, Trophy, ShieldCheck, Timer, X } from 'lucide-react';
 import { TokenChart } from './TokenChart';
+
+export interface BuySignal {
+    ticker: CexTicker;
+    vwap: VwapData;
+    score: number;
+    reason: string;
+    type: 'GOLDEN' | 'MOMENTUM';
+}
 
 interface DecisionBuyAiProps {
     tickers: CexTicker[];
     vwapStore: Record<string, VwapData>;
     firstSeenTimes: Record<string, number>;
     isLoading: boolean;
-    onExternalClick: () => void;
     onAddToWatchlist: (ticker: CexTicker) => void;
 }
 
@@ -121,7 +128,6 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
     vwapStore,
     firstSeenTimes,
     isLoading,
-    onExternalClick,
     onAddToWatchlist
 }) => {
     const [sortBy, setSortBy] = useState<'score' | 'time'>('score');
@@ -192,11 +198,11 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                 };
             }
 
-        }).filter((s): s is (BuySignal & { activeSince: number }) => s !== null && typeof s.activeSince === 'number');
+        }).filter(Boolean) as (BuySignal & { activeSince: number })[];
     }, [tickers, vwapStore, firstSeenTimes]);
 
     const displaySignals = useMemo(() => {
-        let sorted = [...signals];
+        let sorted = [...(signals as (BuySignal & { activeSince: number })[])];
         if (sortBy === 'score') {
             sorted = sorted.sort((a, b) => b.score - a.score);
         } else {
