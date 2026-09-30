@@ -178,21 +178,26 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
 
             const isFreshCrossover = isConfirmedNow && !wasConfirmedPrev;
 
-            if (isFreshCrossover && isVwapPositive) {
+            if (isConfirmedNow && isVwapPositive) {
                 const rvol = vwap.volumeRelative || 1.0;
                 const isNeuralAlpha = vwap.normalizedSlope > 0.10 && rvol > 1.2;
 
                 let score = 95 + Math.min(3, vwap.normalizedSlope * 10);
                 if (rvol > 1.5) score += 2;
                 if (isNeuralAlpha) score += 2;
+                if (!isFreshCrossover) {
+                    score -= 5; // Slightly lower score for ongoing trends vs fresh breakouts
+                }
 
                 return {
                     ticker: t,
                     vwap,
                     score: Math.min(100, score),
-                    reason: isNeuralAlpha
+                    reason: isNeuralAlpha && isFreshCrossover
                         ? `Neural Alpha: Elite fresh 15m confirmed breakout.`
-                        : `Fresh 15m Crossover: Confirmed closed at $${formatPrice(lastClose)}.`,
+                        : isFreshCrossover
+                            ? `Fresh 15m Crossover: Confirmed closed at $${formatPrice(lastClose)}.`
+                            : `Active Bullish Trend: Maintaining structure above VWAP Max.`,
                     activeSince: (firstSeenTimes[t.id] || Date.now()),
                     type: 'GOLDEN' as const
                 };
