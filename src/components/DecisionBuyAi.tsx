@@ -170,13 +170,9 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
             if (!vwap) return null;
 
             const isVwapPositive = vwap.normalizedSlope > 0.05;
-            const lastClose = vwap.last15mClose || 0;
-            const isConfirmedNow = lastClose > vwap.max && lastClose > vwap.mid;
-
-            const prevClose = vwap.prev15mClose || 0;
-            const wasConfirmedPrev = prevClose > vwap.max && prevClose > vwap.mid;
-
-            const isFreshCrossover = isConfirmedNow && !wasConfirmedPrev;
+            const currentPrice = t.priceUsd;
+            const isConfirmedNow = currentPrice > vwap.max && currentPrice > vwap.mid;
+            const isFreshCrossover = false; // We don't have prev15mClose, so treat all as active trends
 
             if (isConfirmedNow && isVwapPositive) {
                 const rvol = vwap.volumeRelative || 1.0;
@@ -196,7 +192,7 @@ export const DecisionBuyAi: FC<DecisionBuyAiProps> = ({
                     reason: isNeuralAlpha && isFreshCrossover
                         ? `Neural Alpha: Elite fresh 15m confirmed breakout.`
                         : isFreshCrossover
-                            ? `Fresh 15m Crossover: Confirmed closed at $${formatPrice(lastClose)}.`
+                            ? `Fresh 15m Crossover: Confirmed closed at $${formatPrice(currentPrice)}.`
                             : `Active Bullish Trend: Maintaining structure above VWAP Max.`,
                     activeSince: (firstSeenTimes[t.id] || Date.now()),
                     type: 'GOLDEN' as const
